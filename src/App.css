@@ -1,0 +1,184 @@
+/*.App {
+  text-align: center;
+}
+
+.App-logo {
+  height: 40vmin;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .App-logo {
+    animation: App-logo-spin infinite 20s linear;
+  }
+}
+
+.App-header {
+  background-color: #282c34;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: calc(10px + 2vmin);
+  color: white;
+}
+
+.App-link {
+  color: #61dafb;
+}
+
+@keyframes App-logo-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+*/
+
+/* App.css */
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #e5e5e5; /* רקע אפור כמו בפיגמה */
+}
+
+.app-root {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* מסגרת "טלפון" */
+.phone-frame {
+  width: 100vw;
+  height: 100vh;
+  background: #f7f7f7;
+  border-radius: 24px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+/* מסך הצ'אט הכללי */
+.chat-screen {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+
+}
+
+/* אזור ההודעות */
+.messages-area {
+  flex: 1;
+  padding: 16px 12px 8px;
+  overflow-y: auto;
+}
+
+/* בועות ההודעות */
+.message-bubble {
+  max-width: 90%;
+  padding: 8px 10px;
+  border-radius: 10px;
+  font-size: 11px;
+  line-height: 1.4;
+  margin-bottom: 8px;
+}
+
+/* הודעת מערכת (למעלה) */
+.message-bubble.system {
+  align-self: flex-start;
+  background: #ffffff;
+  border: 1px solid #d9d9d9;
+}
+
+/* הודעת משתמש */
+.message-bubble.user {
+  align-self: flex-start; /* אפשר לשנות ל-flex-end אם תרצה יישור לימין */
+  background: #f0f0f0;
+  color: #555;
+}
+
+/* אזור הקלט */
+.input-bar {
+  display: flex;
+  align-items: center;
+  padding: 6px 8px;
+  background: #e1e1e1;
+}
+
+/* כפתורי האייקון (שליחה + מיקרופון) */
+.input-icon-button {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  border: none;
+  background: #f7f7f7;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.input-icon-button.send {
+  margin-right: 6px;
+}
+
+.input-icon-button.mic {
+  margin-left: 6px;
+}
+
+/* שדה הכתיבה */
+.input-field {
+  flex: 1;
+  border: none;
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 11px;
+  outline: none;
+}
+
+/* ניווט תחתון */
+.bottom-nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #f0f0f0;
+  padding: 6px 10px 8px;
+  border-top: 1px solid #d9d9d9;
+}
+
+.nav-item {
+  flex: 1;
+  border: none;
+  background: transparent;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  cursor: pointer;
+  padding: 4px 0;
+}
+
+.nav-item-active .nav-label {
+  font-weight: 600;
+}
+
+.nav-icon {
+  font-size: 15px;
+  line-height: 1;
+  margin-bottom: 2px;
+}
+
+.nav-label {
+  text-transform: lowercase;
+}

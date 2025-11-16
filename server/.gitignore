@@ -1,0 +1,11 @@
+# Ignore server environment
+server/.env
+
+# Ignore node modules
+node_modules/
+server/node_modules/
+
+# Next.js / Vite / CRA cache (ליתר ביטחון)
+dist/
+build/
+.cache/
