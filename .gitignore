@@ -1,12 +1,14 @@
-# ignore environment variables
+# Ignore all environment files (protect API keys)
+.env
+.env.local
+*.env
 server/.env
 
-# ignore node modules
+# Ignore node_modules
 node_modules/
 server/node_modules/
 
-# build artifacts
+# Ignore build folders
 dist/
 build/
 .cache/
-
