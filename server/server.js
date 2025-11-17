@@ -2,16 +2,19 @@
 import express from "express";
 import cors from "cors";
 import bodyParser from "body-parser";
-import OpenAI from "openai";
+import Groq from "groq-sdk";
 
 const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 
 // שים את המפתח בקובץ .env ולא בקוד עצמו
-const client = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+import Groq from "groq-sdk";
+
+const client = new Groq({
+  apiKey: process.env.GROQ_API_KEY,
 });
+
 
 app.post("/api/interpret", async (req, res) => {
   try {
@@ -26,22 +29,18 @@ app.post("/api/interpret", async (req, res) => {
       "You are NOT a therapist and do not give medical or psychological diagnoses. " +
       "Offer symbolic and narrative interpretation only, in a supportive tone.";
 
-    const completion = await client.responses.create({
-      model: "gpt-4.1-mini",
-      input: [
-        {
-          role: "system",
-          content: systemPrompt,
-        },
-        {
-          role: "user",
-          content: `Here is a dream to interpret:\n\n${dreamText}`,
-        },
-      ],
-    });
+const completion = await client.chat.completions.create({
+  model: "llama3-8b-8192",
+  messages: [
+    { role: "system", content: systemPrompt },
+    { role: "user", content: `Here is a dream to interpret:\n\n${dreamText}` },
+  ],
+});
 
-    const aiText =
-      completion.output[0]?.content?.[0]?.text || "I’m not sure how to interpret this dream.";
+const aiText =
+  completion.choices?.[0]?.message?.content ||
+  "I'm not sure how to interpret this dream.";
+
 
     res.json({ interpretation: aiText });
   } catch (err) {
