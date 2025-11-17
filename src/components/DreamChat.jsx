@@ -19,7 +19,7 @@ function DreamChat() {
       { id: Date.now() + Math.random(), ...msg },
     ]);
 
-  const handleSend = async () => {
+  /*const handleSend = async () => {
     const trimmed = inputValue.trim();
     if (!trimmed || isLoading) return;
 
@@ -36,7 +36,7 @@ function DreamChat() {
     });
 
     try {
-fetch("https://dream-eyyq.onrender.com/api/interpret", {
+      fetch("https://dream-eyyq.onrender.com/api/interpret", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -73,7 +73,62 @@ fetch("https://dream-eyyq.onrender.com/api/interpret", {
     } finally {
       setIsLoading(false);
     }
-  };
+  };*/
+const handleSend = async () => {
+  const trimmed = inputValue.trim();
+  if (!trimmed || isLoading) return;
+
+  // 1) מוסיפים את הודעת המשתמש לצ'ט
+  addMessage({ type: "user", text: trimmed });
+  setInputValue("");
+
+  // 2) מראים הודעת "חושב..."
+  setIsLoading(true);
+  addMessage({
+    type: "system",
+    text: "Interpreting your dream... ✨",
+    temp: true,
+  });
+
+  try {
+    const response = await fetch("https://dream-eyyq.onrender.com/api/interpret", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ dreamText: trimmed }),
+    });
+
+    const data = await response.json();
+
+    // מסירים את ההודעה הזמנית "Interpreting..."
+    setMessages((prev) => prev.filter((m) => !m.temp));
+
+    if (!response.ok || !data.interpretation) {
+      addMessage({
+        type: "system",
+        text:
+          data.error ||
+          "Sorry, I couldn’t interpret your dream right now. Please try again.",
+      });
+    } else {
+      // 3) מוסיפים את הפירוש מה-AI
+      addMessage({
+        type: "system",
+        text: data.interpretation,
+      });
+    }
+  } catch (err) {
+    console.error(err);
+    setMessages((prev) => prev.filter((m) => !m.temp));
+    addMessage({
+      type: "system",
+      text: "Something went wrong while interpreting your dream.",
+    });
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   const handleKeyDown = (e) => {
     if (e.key === "Enter") {
