@@ -36,7 +36,7 @@ function DreamChat() {
     });
 
     try {
-      const response = await fetch("http://localhost:4000/api/interpret", {
+fetch("https://dream-eyyq.onrender.com/api/interpret", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
