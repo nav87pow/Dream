@@ -9,7 +9,6 @@ app.use(cors());
 app.use(bodyParser.json());
 
 // שים את המפתח בקובץ .env ולא בקוד עצמו
-import Groq from "groq-sdk";
 
 const client = new Groq({
   apiKey: process.env.GROQ_API_KEY,
