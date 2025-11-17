@@ -1,0 +1,17 @@
+keep the working version
+api/interpret:
+
+
+app.post("/api/interpret", async (req, res) => {
+  const { dreamText } = req.body;
+
+  console.log("Received dreamText:", dreamText);
+
+  if (!dreamText || typeof dreamText !== "string") {
+    return res.status(400).json({ error: "dreamText is required" });
+  }
+
+  const fakeInterpretation = `This is a placeholder interpretation of your dream:\n\n"${dreamText}"\n\n(If you see this, front↔server works ✅)`;
+
+  return res.json({ interpretation: fakeInterpretation });
+});
