@@ -1,6 +1,6 @@
 X-X EXPERIMENTAL PROJECT #-#
 
-Hello, you r visiting an experimental project between myself and myself ^.-
+Hello, you are visiting an experimental project between myself and myself ^.-
 
 I'm examining how AI works in the backend side useing Groq and Render server, with the help of its cool abilities, I can develop cool things, give it instructions and perhaps do some commands
 

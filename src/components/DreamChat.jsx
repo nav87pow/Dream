@@ -68,7 +68,8 @@ const [tags, setTags] = useState({
 
     try {
       const response = await fetch(
-"https://dream-eyyq.onrender.com/api/interpret",
+ /*"http://localhost:4000/api/interpret"*/
+       "https://dream-eyyq.onrender.com/api/interpret",
         {
           method: "POST",
           headers: {
