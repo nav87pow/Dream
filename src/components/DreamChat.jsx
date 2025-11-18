@@ -1,5 +1,5 @@
-// src/components/DreamChat.jsx
 import React, { useState } from "react";
+import CategoryStep from "./categories/CategoryStep";
 
 function DreamChat() {
   const [inputValue, setInputValue] = useState("");
@@ -11,6 +11,11 @@ function DreamChat() {
     },
   ]);
 
+  const [selectedCategoryId, setSelectedCategoryId] = useState(null);
+  // eslint-disable-next-line no-unused-vars
+  const [selectedMethodId, setSelectedMethodId] = useState(null);
+  const [flowStep, setFlowStep] = useState("idle");
+  const [pendingDreamText, setPendingDreamText] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
   const addMessage = (msg) =>
@@ -19,16 +24,34 @@ function DreamChat() {
       { id: Date.now() + Math.random(), ...msg },
     ]);
 
-  /*const handleSend = async () => {
+  const handleSend = async () => {
     const trimmed = inputValue.trim();
     if (!trimmed || isLoading) return;
 
-    // 1) מוסיפים את הודעת המשתמש לצ'ט
+    if (flowStep === "category" || flowStep === "method") return;
+
     addMessage({ type: "user", text: trimmed });
     setInputValue("");
 
-    // 2) מראים הודעת "חושב..."
+    setPendingDreamText(trimmed);
+    setSelectedCategoryId(null);
+    setSelectedMethodId(null);
+    setFlowStep("category");
+  };
+
+  const handleCategorySelect = (categoryId) => {
+    setSelectedCategoryId(categoryId);
+    setSelectedMethodId(null);
+    setFlowStep("method");
+  };
+
+  const handleMethodSelect = async (methodId) => {
+    if (!pendingDreamText || isLoading) return;
+
+    setSelectedMethodId(methodId);
+    setFlowStep("interpreting");
     setIsLoading(true);
+
     addMessage({
       type: "system",
       text: "Interpreting your dream... ✨",
@@ -36,17 +59,24 @@ function DreamChat() {
     });
 
     try {
-      fetch("https://dream-eyyq.onrender.com/api/interpret", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ dreamText: trimmed }),
-      });
+      const response = await fetch(
+"http://localhost:4000/api/interpret"/*"https://dream-eyyq.onrender.com/api/interpret"*/,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          // 🔹 כאן השינוי היחיד: שמות שדות תואמים ל-server
+          body: JSON.stringify({
+            dreamText: pendingDreamText,
+            category: selectedCategoryId,
+            method: methodId,
+          }),
+        }
+      );
 
       const data = await response.json();
 
-      // מסירים את ההודעה הזמנית "Interpreting..."
       setMessages((prev) => prev.filter((m) => !m.temp));
 
       if (!response.ok || !data.interpretation) {
@@ -57,7 +87,6 @@ function DreamChat() {
             "Sorry, I couldn’t interpret your dream right now. Please try again.",
         });
       } else {
-        // 3) מוסיפים את הפירוש מה-AI
         addMessage({
           type: "system",
           text: data.interpretation,
@@ -72,63 +101,10 @@ function DreamChat() {
       });
     } finally {
       setIsLoading(false);
+      setFlowStep("idle");
+      setPendingDreamText("");
     }
-  };*/
-const handleSend = async () => {
-  const trimmed = inputValue.trim();
-  if (!trimmed || isLoading) return;
-
-  // 1) מוסיפים את הודעת המשתמש לצ'ט
-  addMessage({ type: "user", text: trimmed });
-  setInputValue("");
-
-  // 2) מראים הודעת "חושב..."
-  setIsLoading(true);
-  addMessage({
-    type: "system",
-    text: "Interpreting your dream... ✨",
-    temp: true,
-  });
-
-  try {
-    const response = await fetch("https://dream-eyyq.onrender.com/api/interpret", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ dreamText: trimmed }),
-    });
-
-    const data = await response.json();
-
-    // מסירים את ההודעה הזמנית "Interpreting..."
-    setMessages((prev) => prev.filter((m) => !m.temp));
-
-    if (!response.ok || !data.interpretation) {
-      addMessage({
-        type: "system",
-        text:
-          data.error ||
-          "Sorry, I couldn’t interpret your dream right now. Please try again.",
-      });
-    } else {
-      // 3) מוסיפים את הפירוש מה-AI
-      addMessage({
-        type: "system",
-        text: data.interpretation,
-      });
-    }
-  } catch (err) {
-    console.error(err);
-    setMessages((prev) => prev.filter((m) => !m.temp));
-    addMessage({
-      type: "system",
-      text: "Something went wrong while interpreting your dream.",
-    });
-  } finally {
-    setIsLoading(false);
-  }
-};
+  };
 
   const handleKeyDown = (e) => {
     if (e.key === "Enter") {
@@ -141,7 +117,6 @@ const handleSend = async () => {
     <div className="app-root">
       <div className="phone-frame">
         <div className="chat-screen">
-          {/* הודעות */}
           <div className="messages-area">
             {messages.map((msg) => (
               <div
@@ -155,9 +130,20 @@ const handleSend = async () => {
             ))}
           </div>
 
-          {/* קלט */}
+          {(flowStep === "category" || flowStep === "method") && (
+            <CategoryStep
+              selectedCategoryId={selectedCategoryId}
+              onCategorySelect={handleCategorySelect}
+              onMethodSelect={handleMethodSelect}
+            />
+          )}
+
           <div className="input-bar">
-            <button className="input-icon-button send" onClick={handleSend}>
+            <button
+              className="input-icon-button send"
+              onClick={handleSend}
+              disabled={isLoading}
+            >
               &lt;
             </button>
 
@@ -175,10 +161,11 @@ const handleSend = async () => {
               disabled={isLoading}
             />
 
-            <button className="input-icon-button mic">🎙</button>
+            <button className="input-icon-button mic" disabled={isLoading}>
+              🎙
+            </button>
           </div>
 
-          {/* ניווט תחתון */}
           <nav className="bottom-nav">
             <button className="nav-item">
               <span className="nav-icon">📓</span>
