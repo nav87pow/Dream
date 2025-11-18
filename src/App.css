@@ -181,3 +181,29 @@ body {
 .nav-label {
   text-transform: lowercase;
 }
+
+/*tag dream pill*/
+.tags-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.tag-pill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 4px 10px;
+  border: 1px solid #000;
+  font-size: 12px;
+}
+
+.tag-remove {
+  margin-left: 6px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+}

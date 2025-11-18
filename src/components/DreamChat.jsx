@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import CategoryStep from "./categories/CategoryStep";
+import TagsList from "./tags/TagsList";
 
 function DreamChat() {
   const [inputValue, setInputValue] = useState("");
@@ -17,6 +18,13 @@ function DreamChat() {
   const [flowStep, setFlowStep] = useState("idle");
   const [pendingDreamText, setPendingDreamText] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+const [tags, setTags] = useState({
+  people: ["mother", "friend"],
+  places: ["school"],
+  objects: ["car"],
+  feelings: ["fear"],
+  other: [],
+});
 
   const addMessage = (msg) =>
     setMessages((prev) => [
@@ -60,6 +68,7 @@ function DreamChat() {
 
     try {
       const response = await fetch(
+/*"http://localhost:4000/api/interpret"*/
 "https://dream-eyyq.onrender.com/api/interpret",
         {
           method: "POST",
@@ -86,12 +95,16 @@ function DreamChat() {
             data.error ||
             "Sorry, I couldn’t interpret your dream right now. Please try again.",
         });
-      } else {
-        addMessage({
-          type: "system",
-          text: data.interpretation,
-        });
-      }
+   } else {
+  addMessage({
+    type: "system",
+    text: data.interpretation,
+    title: data.title,
+    methodUsed: data.methodUsed,
+    tags: data.tags,   // 👈 זה מה שמאפשר ל־TagsList לעבוד
+  });
+}
+
     } catch (err) {
       console.error(err);
       setMessages((prev) => prev.filter((m) => !m.temp));
@@ -117,18 +130,36 @@ function DreamChat() {
     <div className="app-root">
       <div className="phone-frame">
         <div className="chat-screen">
-          <div className="messages-area">
-            {messages.map((msg) => (
-              <div
-                key={msg.id}
-                className={`message-bubble ${
-                  msg.type === "system" ? "system" : "user"
-                }`}
-              >
-                {msg.text}
-              </div>
-            ))}
-          </div>
+
+
+ <div className="messages-area">
+  {messages.map((msg) => (
+    <div
+      key={msg.id}
+      className={`message-bubble ${
+        msg.type === "system" ? "system" : "user"
+      }`}
+    >
+      {msg.text}
+
+      {msg.type === "system" && msg.tags && (
+        <TagsList
+          tags={msg.tags}
+          setTags={(updatedTags) => {
+            // מעדכנים את התגיות רק בהודעה הזאת
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === msg.id ? { ...m, tags: updatedTags } : m
+              )
+            );
+          }}
+        />
+      )}
+    </div>
+  ))}
+</div>
+
+
 
           {(flowStep === "category" || flowStep === "method") && (
             <CategoryStep
@@ -136,6 +167,7 @@ function DreamChat() {
               onCategorySelect={handleCategorySelect}
               onMethodSelect={handleMethodSelect}
             />
+            
           )}
 
           <div className="input-bar">
