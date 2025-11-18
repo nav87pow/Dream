@@ -18,13 +18,6 @@ function DreamChat() {
   const [flowStep, setFlowStep] = useState("idle");
   const [pendingDreamText, setPendingDreamText] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-const [tags, setTags] = useState({
-  people: ["mother", "friend"],
-  places: ["school"],
-  objects: ["car"],
-  feelings: ["fear"],
-  other: [],
-});
 
   const addMessage = (msg) =>
     setMessages((prev) => [
