@@ -207,3 +207,35 @@ body {
   font-size: 12px;
   line-height: 1;
 }
+
+/*text user edit area*/
+/* מצב רגיל */
+.user-dream-textarea {
+  width: 100%;
+  display: block;
+  box-sizing: border-box;
+  background: transparent;
+  border: none;
+  outline: none;
+  resize: none; /* לא רוצים אחיזה של שינוי גודל */
+  font: inherit;
+  color: inherit;
+  overflow: hidden; /* חשוב גובה אוטומטי */
+}
+
+/* מצב עריכה */
+.user-dream-textarea.editing {
+  background: white;
+  color: #0044ff; /* כחול לטקסט */
+}
+
+/* placeholder כחול */
+.user-dream-textarea.editing::placeholder {
+  color: #3a66ff;
+}
+
+/* שיהיה פינות עגולות קצת יפה */
+.user-dream-textarea.editing {
+  border-radius: 6px;
+  padding: 6px 8px;
+}
