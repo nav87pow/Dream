@@ -32,7 +32,7 @@ const LANGUAGE_NAMES = {
   no: "Norwegian",
   fi: "Finnish",
   sv: "Swedish",
-  ja: "Japanese",   // ← חדש
+  ja: "Japanese",
 };
 
 const client = new Groq({
@@ -48,14 +48,16 @@ app.post("/api/interpret", async (req, res) => {
     if (!dreamText || !dreamText.trim()) {
       return res.status(400).json({ error: "Dream text is required" });
     }
-// language מגיע מהפרונט (למשל "he" או "en")
-const langCode = (language || "en").toLowerCase();
 
-// שם השפה שהמודל יבין טוב יותר
-const langName =
-  LANGUAGE_NAMES[langCode] ||
-  LANGUAGE_NAMES[langCode.slice(0, 2)] ||
-  "English";
+    // language מגיע מהפרונט (למשל "he" או "en")
+    const langCode = (language || "en").toLowerCase();
+
+    // שם השפה שהמודל יבין טוב יותר
+    const langName =
+      LANGUAGE_NAMES[langCode] ||
+      LANGUAGE_NAMES[langCode.slice(0, 2)] ||
+      "English";
+
     // ⭐ systemPrompt – שמירה על הרוח שלך + דרישה ל-JSON עם methodUsed
     const systemPrompt = `
     You are a dream interpreter.
@@ -184,6 +186,7 @@ Map your response into the JSON fields described in the system message:
     });
   }
 });
+
 // ⭐ endpoint לתרגום טקסטים של הממשק – יציב וסלחני
 app.post("/api/translate", async (req, res) => {
   try {
@@ -199,11 +202,20 @@ app.post("/api/translate", async (req, res) => {
       return res.json({ translations: {} });
     }
 
+    // ⭐ ממירים קודי שפה (he, en וכו') לשמות שפה אנושיים
+    const srcCode = (sourceLanguage || "en").toLowerCase();
+    const tgtCode = (targetLanguage || "en").toLowerCase();
+
+    const sourceName = LANGUAGE_NAMES[srcCode] || "English";
+    const targetName =
+      LANGUAGE_NAMES[tgtCode] || targetLanguage || "English";
+
     const systemPrompt = `
-You are a translation engine. 
+You are a translation engine.
 Translate ONLY the "text" field for each item.
 Keep the same keys.
-Translate from ${sourceLanguage} to ${targetLanguage}.
+Translate from ${sourceName} to ${targetName}.
+You MUST output the "${targetName}" translation, not English.
 Return ONLY valid JSON in this exact shape:
 {
   "translations": {
@@ -260,4 +272,3 @@ const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {
   console.log(`Server listening on port ${PORT}`);
 });
-
