@@ -49,16 +49,13 @@ app.post("/api/interpret", async (req, res) => {
       return res.status(400).json({ error: "Dream text is required" });
     }
 
-    // language מגיע מהפרונט (למשל "he" או "en")
     const langCode = (language || "en").toLowerCase();
-
-    // שם השפה שהמודל יבין טוב יותר
     const langName =
       LANGUAGE_NAMES[langCode] ||
       LANGUAGE_NAMES[langCode.slice(0, 2)] ||
       "English";
 
-    // ⭐ systemPrompt – שמירה על הרוח שלך + דרישה ל-JSON עם methodUsed
+  
     const systemPrompt = `
 You are a dream interpreter.
 Always respond in ${langName}.
@@ -69,14 +66,14 @@ emotional guidance, or personal suggestions. You are NOT a therapist and do NOT
 give medical, psychological, or spiritual diagnoses. Offer symbolic and narrative
 interpretation only. There is no follow-up conversation.
 
-You MUST NOT ask the user any questions. Do NOT end with sentences like:
-"How does this resonate with you?" or "Let me know if..." or similar.
-Simply present the interpretation and then stop.
+You MUST NOT ask the user any questions. Do NOT end with phrases like:
+"How does this resonate with you?" or similar.
 
-IMPORTANT OUTPUT RULES:
-- You MUST output your answer as VALID JSON ONLY.
-- No extra text, no explanations, no markdown, no comments.
-- The JSON MUST follow this exact structure:
+OUTPUT RULES:
+- You MUST output ONLY valid JSON.
+- No text before or after.
+- No markdown, no explanations.
+- Follow exactly this structure:
 
 {
   "methodUsed": "${method || "unspecified"}",
@@ -91,14 +88,17 @@ IMPORTANT OUTPUT RULES:
   }
 }
 
-Content rules:
-- "interpretation" should be concise: up to 4 short paragraphs total (max ~400–500 words).
-- Focus only on the dream content, not on the dreamer as a person.
+INTERPRETATION LENGTH RULES:
+- 2–4 paragraphs total (5 short paragraphs also acceptable).
+- No hard word limit, but prefer staying below ~1200 words.
+- Keep sentences compact, avoid repetition.
+- Stay strictly inside the chosen method.
+- Do NOT drift into long storytelling.
+- Focus only on dream content (not on the dreamer).
 
-Do NOT include ANY text before or after this JSON.
-    `.trim();
+Do NOT include ANYTHING outside the JSON object.
+`.trim();
 
-    // ⭐ userPrompt – החוקים שלך + חיבור לשדות JSON
     const userPrompt = `
 Input:
 - Category: ${category || "unspecified"}
@@ -106,36 +106,23 @@ Input:
 - Dream text: """${dreamText}"""
 
 Rules:
-1. Interpret the dream ONLY through the selected category and method (if provided).
-2. Follow the theoretical concepts, symbols, logic, and structure of that method.
-3. Do not switch frameworks or mix methods.
-4. Do NOT give advice, emotional guidance, or tell the dreamer what to do.
-5. Do NOT analyze the dreamer as a person — only the dream content.
-6. Maintain a neutral, descriptive, method-based tone.
+1. Interpret ONLY with the selected method and category.
+2. Follow the structure, logic, and symbolism of that method.
+3. Do NOT mix frameworks.
+4. Do NOT give advice or psychological guidance.
+5. Focus strictly on the dream content.
 
-Adaptive depth rule:
-- If the dream is very short or minimal (e.g., one line or one scene),
-  provide a concise interpretation (1–2 paragraphs).
-- If the dream contains multiple elements, symbolism, or narrative structure,
-  give a more detailed interpretation (up to 3–4 paragraphs total).
+Adaptive depth:
+- Very short dream → 1–2 short paragraphs.
+- Multi-element dream → up to 3–4 paragraphs.
 
-Map your response into the JSON fields described in the system message:
-- "methodUsed" = the method or framework you used for this interpretation.
-- "title" = 1 short descriptive line summarizing the dream.
-- "interpretation" = the full method-based interpretation text.
-- "tags" = extract only elements that appear in the dream text, grouped into:
-  - places
-  - people
-  - objects
-  - symbols
-  - colors
+Map your interpretation into the JSON fields described in the system message.
     `.trim();
 
     const completion = await client.chat.completions.create({
       model: "llama-3.1-8b-instant",
-      // ❌ הורדנו response_format כדי למנוע json_validate_failed מה־API
-      // response_format: { type: "json_object" },
-      max_tokens: 600,
+      response_format: { type: "json_object" },
+      max_tokens: 1200,
       temperature: 0.4,
       messages: [
         { role: "system", content: systemPrompt },
@@ -144,15 +131,13 @@ Map your response into the JSON fields described in the system message:
     });
 
     const raw = completion.choices?.[0]?.message?.content || "{}";
-    console.log("RAW FROM MODEL:", raw); // לעזור בדיבאג אם צריך
+    console.log("RAW FROM MODEL:", raw);
 
     let parsed;
     try {
       parsed = JSON.parse(raw);
     } catch (e) {
       console.error("Failed to parse AI JSON:", raw);
-
-      // fallback – גם אם המודל יתפלק, לא מפילים את השרת
       parsed = {
         methodUsed: method || "unspecified",
         title: "Dream interpretation",
@@ -171,8 +156,7 @@ Map your response into the JSON fields described in the system message:
       methodUsed: parsed.methodUsed || method || "unspecified",
       title: parsed.title || "Dream interpretation",
       interpretation:
-        parsed.interpretation ||
-        "I'm not sure how to interpret this dream.",
+        parsed.interpretation || "I'm not sure how to interpret this dream.",
       tags: {
         places: parsed.tags?.places || [],
         people: parsed.tags?.people || [],
@@ -193,7 +177,7 @@ Map your response into the JSON fields described in the system message:
   }
 });
 
-// ⭐ endpoint לתרגום טקסטים של הממשק – יציב וסלחני
+// ⭐ TRANSLATION ENDPOINT — unchanged
 app.post("/api/translate", async (req, res) => {
   try {
     const {
@@ -202,27 +186,24 @@ app.post("/api/translate", async (req, res) => {
       texts = [],
     } = req.body;
 
-    // אם הגוף לא תקין – לא מפילים את האפליקציה
     if (!targetLanguage || !Array.isArray(texts) || texts.length === 0) {
-      console.error("Bad translate request body:", req.body);
+      console.error("Bad translate request:", req.body);
       return res.json({ translations: {} });
     }
 
-    // ⭐ ממירים קודי שפה (he, en וכו') לשמות שפה אנושיים
-    const srcCode = (sourceLanguage || "en").toLowerCase();
-    const tgtCode = (targetLanguage || "en").toLowerCase();
+    const srcCode = sourceLanguage.toLowerCase();
+    const tgtCode = targetLanguage.toLowerCase();
 
     const sourceName = LANGUAGE_NAMES[srcCode] || "English";
-    const targetName =
-      LANGUAGE_NAMES[tgtCode] || targetLanguage || "English";
+    const targetName = LANGUAGE_NAMES[tgtCode] || targetLanguage;
 
     const systemPrompt = `
 You are a translation engine.
-Translate ONLY the "text" field for each item.
-Keep the same keys.
+Translate ONLY the "text" field.
+Keep keys unchanged.
 Translate from ${sourceName} to ${targetName}.
-You MUST output the "${targetName}" translation, not English.
-Return ONLY valid JSON in this exact shape:
+Output ONLY valid JSON:
+
 {
   "translations": {
     "<key>": "<translated text>"
@@ -244,31 +225,25 @@ No markdown, no commentary.
     });
 
     const raw = completion.choices?.[0]?.message?.content || "{}";
-    console.log("RAW TRANSLATION FROM MODEL:", raw);
+    console.log("RAW TRANSLATION:", raw);
 
     let translationsMap = {};
 
     try {
       const parsed = JSON.parse(raw);
 
-      if (parsed && typeof parsed === "object") {
-        if (parsed.translations && typeof parsed.translations === "object") {
-          // המקרה הרגיל – מה שביקשנו
-          translationsMap = parsed.translations;
-        } else {
-          // fallback – אם המודל החזיר ישר map של key -> text
-          translationsMap = parsed;
-        }
+      if (parsed.translations && typeof parsed.translations === "object") {
+        translationsMap = parsed.translations;
+      } else {
+        translationsMap = parsed;
       }
-    } catch (err) {
-      console.error("Failed to parse JSON returned by the model:", err);
+    } catch {
       translationsMap = {};
     }
 
-    // תמיד מחזירים 200 – במקרה הכי גרוע אין תרגומים, נשארים באנגלית
     return res.json({ translations: translationsMap });
   } catch (err) {
-    console.error("Translation API error:", err?.response?.data || err);
+    console.error("Translation API error:", err);
     return res.json({ translations: {} });
   }
 });
