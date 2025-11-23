@@ -13,7 +13,8 @@ const DEFAULT_LANG = "en";
 
 // ⭐ הכתובת של השרת – כאן משתמשים בפועל ולכן אין warning
 //const API_URL = "http://localhost:4000";
-const API_URL = "http://localhost:4000/api";
+// ⭐ השרת ברנדר – בסיס אחד בלי /api כפול
+const API_URL = "https://dream-eyyq.onrender.com";
 
 export function TranslationProvider({ children }) {
   const [language, setLanguage] = useState(DEFAULT_LANG);
