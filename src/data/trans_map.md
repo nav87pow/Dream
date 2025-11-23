@@ -17,6 +17,8 @@ chat.system.error.couldNotInterpret
 chat.system.error.generic
 chat.input.placeholder.loading
 chat.input.placeholder.default
+chat.input.button.send
+chat.input.button.edit
 chat.nav.diary
 chat.nav.interpretation
 chat.nav.profile

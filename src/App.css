@@ -239,3 +239,187 @@ body {
   border-radius: 6px;
   padding: 6px 8px;
 }
+/* === Dream input card – המעטפת הכללית === */
+
+.dream-input-card {
+  width: 92%;
+  margin: 0.5rem auto 0.75rem auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  background: #ffffff;
+  border-radius: 1.25rem;
+  padding: 0.6rem 0.8rem;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+}
+
+/* אזור הטקסט של החלום */
+
+.dream-textarea {
+  width: 100%;
+  min-height: 70px;
+  max-height: 130px;
+  resize: none;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 0.9rem;
+  line-height: 1.4;
+  color: #222;
+  font-family: inherit;
+}
+
+.dream-textarea[readonly] {
+  color: #666;
+}
+
+/* שורת הכפתורים בתחתית הכרטיס */
+
+.dream-actions-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+/* כפתור Send / Edit */
+
+.send-edit-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  border: none;
+  border-radius: 999px;
+  padding: 0.35rem 0.9rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.send-edit-btn.send {
+  background: #4b4bff;
+  color: #ffffff;
+  box-shadow: 0 3px 6px rgba(75, 75, 255, 0.35);
+}
+
+.send-edit-btn.edit {
+  background: #f3f3f7;
+  color: #333;
+}
+
+.send-edit-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.12);
+}
+
+.send-edit-icon {
+  font-size: 1rem;
+}
+
+.send-edit-label {
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+/* צד ימין – פס ההקלטה */
+
+.audio-recorder-bar {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+/* כפתור מיקרופון */
+
+.record-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  border-radius: 999px;
+  border: none;
+  padding: 0.3rem 0.7rem;
+  font-size: 0.75rem;
+  cursor: pointer;
+  background: #ffeaea;
+  color: #b30000;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.record-btn.recording {
+  background: #ffb3b3;
+}
+
+.record-btn.paused {
+  background: #f0f0f0;
+  color: #444;
+}
+
+.record-btn:hover {
+  transform: translateY(-1px);
+}
+
+.record-icon {
+  font-size: 1rem;
+}
+
+.record-label {
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+/* גלי ההקלטה */
+
+.wave-animation {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.12rem;
+  height: 20px;
+  min-width: 28px;
+}
+
+.wave-bar {
+  width: 3px;
+  border-radius: 999px;
+  background: #ccc;
+  height: 6px;
+  animation: waveIdle 1.4s ease-in-out infinite;
+}
+
+/* מצבים שונים לפי state */
+
+.wave-recording .wave-bar {
+  background: #ff6b6b;
+  animation-name: waveBounce;
+  animation-duration: 0.8s;
+}
+
+.wave-paused .wave-bar {
+  background: #ddd;
+  animation: none;
+  height: 10px;
+}
+
+.wave-idle .wave-bar {
+  opacity: 0.4;
+}
+
+/* אנימציות */
+
+@keyframes waveBounce {
+  0%, 100% { height: 4px; }
+  50% { height: 16px; }
+}
+
+@keyframes waveIdle {
+  0%, 100% { height: 5px; }
+  50% { height: 9px; }
+}
+
+.wave-bar:nth-child(2) { animation-delay: 0.1s; }
+.wave-bar:nth-child(3) { animation-delay: 0.2s; }
+.wave-bar:nth-child(4) { animation-delay: 0.3s; }

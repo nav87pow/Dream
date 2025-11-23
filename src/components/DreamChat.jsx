@@ -5,7 +5,7 @@ import TagsList from "./tags/TagsList";
 import EditableUserBubble from "./EditableUserBubble";
 import BottomNav from "./BottomNav/BottomNav";
 import { useTranslation } from "../TranslationContext";
-
+import DreamInputCard from "./DreamInputCard/DreamInputCard";
 // כתובת השרת שמדבר עם Groq (מקומי)
 //const API_URL = "http://localhost:4000/api/interpret";
 // כשתרצה לעבוד מול Render:
@@ -81,6 +81,135 @@ function DreamChat({ currentScreen, onChangeScreen }) {
     setSelectedMethodId(null);
     setFlowStep("category");
   };
+  // שליחה דרך הכרטיס החדש (DreamInputCard) בלי לפגוע ב-input הישן
+   // שליחה דרך הכרטיס החדש (DreamInputCard)
+  // אם כבר יש lastCategory + lastMethod → נתנהג כמו "send again"
+  // אם אין → נפתח בחירת קטגוריה/שיטה כמו ב-handleSend הרגיל
+  const handleSendFromCard = async (textFromCard) => {
+    const trimmed = (textFromCard || "").trim();
+    if (!trimmed || isLoading) return;
+
+    if (flowStep === "category" || flowStep === "method") return;
+
+    // 🔁 מצב 1 – יש כבר קטגוריה ושיטה אחרונות → עדכון פירוש קיים
+    if (lastCategory && lastMethod) {
+      // נסנכרן את הסטייט של החלום לערך החדש מהכרטיס
+      setDreamText(trimmed);
+
+      setIsLoading(true);
+      setFlowStep("interpreting");
+
+      // הודעת ביניים זמנית – כמו ב-handleSendAgain
+      addMessage({
+        type: "system",
+        text: t("chat.system.interpretingUpdated"),
+        temp: true,
+      });
+
+      try {
+        const response = await fetch(API_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            dreamText: trimmed,
+            category: lastCategory,
+            method: lastMethod,
+            language,
+          }),
+        });
+
+        const data = await response.json();
+
+        setMessages((prev) => {
+          const withoutTemp = prev.filter((m) => !m.temp);
+
+          if (!response.ok || !data.interpretation) {
+            // במקרה של שגיאה – נוסיף הודעת system חדשה
+            return [
+              ...withoutTemp,
+              {
+                id: Date.now() + Math.random(),
+                type: "system",
+                text:
+                  data.error ||
+                  t("chat.system.error.couldNotInterpret"),
+              },
+            ];
+          }
+
+          // כמו ב-handleSendAgain: מעדכן את הפירוש האחרון במקום ליצור חדש
+          const updated = [...withoutTemp];
+
+          const lastSystemIndexFromEnd = [...updated]
+            .reverse()
+            .findIndex((m) => m.type === "system");
+
+          if (lastSystemIndexFromEnd === -1) {
+            updated.push({
+              id: Date.now() + Math.random(),
+              type: "system",
+              text: data.interpretation,
+              title: data.title,
+              methodUsed: data.methodUsed,
+              tags: data.tags,
+            });
+            return updated;
+          }
+
+          const realIndex = updated.length - 1 - lastSystemIndexFromEnd;
+
+          updated[realIndex] = {
+            ...updated[realIndex],
+            text: data.interpretation,
+            title: data.title,
+            methodUsed: data.methodUsed,
+            tags: data.tags,
+          };
+
+          return updated;
+        });
+      } catch (err) {
+        console.error(err);
+        setMessages((prev) => {
+          const withoutTemp = prev.filter((m) => !m.temp);
+          return [
+            ...withoutTemp,
+            {
+              id: Date.now() + Math.random(),
+              type: "system",
+              text: t("chat.system.error.generic"),
+            },
+          ];
+        });
+      } finally {
+        setIsLoading(false);
+        setFlowStep("idle");
+        setIsEditingDream(false);
+      }
+
+      // חשוב: במצב הזה אנחנו *לא* פותחים שוב בחירת קטגוריה
+      return;
+    }
+
+    // 🆕 מצב 2 – אין עוד קטגוריה/שיטה → כמו handleSend הרגיל (חלום חדש)
+    addMessage({ type: "user", text: trimmed });
+
+    // כאן אנחנו לא נוגעים ב-inputValue כי זה השדה הישן
+    // setInputValue("");
+
+    setDreamText(trimmed);
+    setIsEditingDream(false);
+    setLastCategory(null);
+    setLastMethod(null);
+
+    setPendingDreamText(trimmed);
+    setSelectedCategoryId(null);
+    setSelectedMethodId(null);
+    setFlowStep("category");
+  };
+
 
   const handleCategorySelect = (categoryId) => {
     setSelectedCategoryId(categoryId);
@@ -330,7 +459,7 @@ function DreamChat({ currentScreen, onChangeScreen }) {
               // אם תרצה – אפשר להוסיף כאן t ולהשתמש בו בתוך הקומפוננטה
             />
           )}
-
+<DreamInputCard onSend={handleSendFromCard} />
           <div className="input-bar">
             <button
               className="input-icon-button send"
@@ -353,6 +482,7 @@ function DreamChat({ currentScreen, onChangeScreen }) {
               onKeyDown={handleKeyDown}
               disabled={isLoading}
             />
+          
 
             <button className="input-icon-button mic" disabled={isLoading}>
               🎙

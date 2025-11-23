@@ -13,8 +13,15 @@
   "chat.system.interpretingUpdated": "Interpreting your updated dream... ✨",
   "chat.system.error.couldNotInterpret": "Sorry, I couldn’t interpret your dream right now. Please try again.",
   "chat.system.error.generic": "Something went wrong while interpreting your dream.",
+  
   "chat.input.placeholder.loading": "Interpreting your dream...",
   "chat.input.placeholder.default": "Type your dream here...",
+  "chat.input.button.send": "send",
+  "chat.input.button.edit": "edit",
+  "chat.input.button.record": "Record",
+"chat.input.button.pause": "Pause",
+"chat.input.button.resume": "Resume",
+
   "chat.nav.diary": "diary",
   "chat.nav.interpretation": "interpretation",
   "chat.nav.profile": "profile",
@@ -312,5 +319,8 @@
   "profile.subtitle": "Manage your dream preferences and language.",
   "profile.section.preferences": "Preferences",
   "profile.section.preferences.description": "Here you will be able to control language and other settings for your dream experience."
+
+
+
 
 }
