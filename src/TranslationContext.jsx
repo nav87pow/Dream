@@ -12,7 +12,8 @@ const TranslationContext = createContext(null);
 const DEFAULT_LANG = "en";
 
 // ⭐ הכתובת של השרת – כאן משתמשים בפועל ולכן אין warning
-const API_URL = "http://localhost:4000";
+//const API_URL = "http://localhost:4000";
+const API_URL = "http://localhost:4000/api";
 
 export function TranslationProvider({ children }) {
   const [language, setLanguage] = useState(DEFAULT_LANG);
