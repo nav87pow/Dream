@@ -1,15 +1,29 @@
-import React, { useState } from "react";
+// src/components/DreamChat.jsx
+import React, { useState, useEffect } from "react";
 import CategoryStep from "./categories/CategoryStep";
 import TagsList from "./tags/TagsList";
 import EditableUserBubble from "./EditableUserBubble";
+import BottomNav from "./BottomNav/BottomNav";
+import { useTranslation } from "../TranslationContext";
 
-function DreamChat() {
+// כתובת השרת שמדבר עם Groq (מקומי)
+//const API_URL = "http://localhost:4000/api/interpret";
+// כשתרצה לעבוד מול Render:
+ const API_URL = "https://dream-eyyq.onrender.com/api/interpret";
+
+function DreamChat({ currentScreen, onChangeScreen }) {
+  // ⭐ לוקחים גם t וגם language מהקונטקסט
+  const { language, t } = useTranslation();
+
   const [inputValue, setInputValue] = useState("");
-  const [messages, setMessages] = useState([
+
+  // הודעת ברוך הבא – שומרת key כדי שנוכל לעדכן כשמשנים שפה
+  const [messages, setMessages] = useState(() => [
     {
       id: 1,
       type: "system",
-      text: "Welcome to your dream sanctuary. Share your dream with me, and I’ll help you unlock its meaning. 🌙",
+      text: t("chat.welcome"),
+      messageKey: "chat.welcome",
     },
   ]);
 
@@ -29,6 +43,17 @@ function DreamChat() {
   // שמירת הבחירה האחרונה של קטגוריה ושיטה (ל-send again)
   const [lastCategory, setLastCategory] = useState(null);
   const [lastMethod, setLastMethod] = useState(null);
+
+  // ⭐ אם השפה משתנה – מעדכן את הודעת ה-welcome לפי t()
+  useEffect(() => {
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.messageKey === "chat.welcome"
+          ? { ...m, text: t("chat.welcome") }
+          : m
+      )
+    );
+  }, [language, t]);
 
   const addMessage = (msg) =>
     setMessages((prev) => [
@@ -76,26 +101,23 @@ function DreamChat() {
 
     addMessage({
       type: "system",
-      text: "Interpreting your dream... ✨",
+      text: t("chat.system.interpreting"),
       temp: true,
     });
 
     try {
-      const response = await fetch(
-       /* "http://localhost:4000/api/interpret"*/
-        "https://dream-eyyq.onrender.com/api/interpret",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            dreamText: pendingDreamText,
-            category: selectedCategoryId,
-            method: methodId,
-          }),
-        }
-      );
+      const response = await fetch(API_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          dreamText: pendingDreamText,
+          category: selectedCategoryId,
+          method: methodId,
+          language, // ⭐ שולחים גם שפה לשרת
+        }),
+      });
 
       const data = await response.json();
 
@@ -105,8 +127,7 @@ function DreamChat() {
         addMessage({
           type: "system",
           text:
-            data.error ||
-            "Sorry, I couldn’t interpret your dream right now. Please try again.",
+            data.error || t("chat.system.error.couldNotInterpret"),
         });
       } else {
         addMessage({
@@ -122,7 +143,7 @@ function DreamChat() {
       setMessages((prev) => prev.filter((m) => !m.temp));
       addMessage({
         type: "system",
-        text: "Something went wrong while interpreting your dream.",
+        text: t("chat.system.error.generic"),
       });
     } finally {
       setIsLoading(false);
@@ -132,109 +153,109 @@ function DreamChat() {
   };
 
   // פירוש חדש בהתאם לעריכה של החלום בבועה
-const handleSendAgain = async () => {
-  if (!dreamText.trim() || !lastCategory || !lastMethod || isLoading) return;
+  const handleSendAgain = async () => {
+    if (!dreamText.trim() || !lastCategory || !lastMethod || isLoading) return;
 
-  setIsLoading(true);
-  setFlowStep("interpreting");
+    setIsLoading(true);
+    setFlowStep("interpreting");
 
-  // הודעת "ביניים" זמנית
-  addMessage({
-    type: "system",
-    text: "Interpreting your updated dream... ✨",
-    temp: true,
-  });
+    // הודעת "ביניים" זמנית
+    addMessage({
+      type: "system",
+      text: t("chat.system.interpretingUpdated"),
+      temp: true,
+    });
 
-  try {
-    const response = await fetch(
-      "https://dream-eyyq.onrender.com/api/interpret",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          dreamText: dreamText, // הטקסט המעודכן בבועת המשתמש
-          category: lastCategory,
-          method: lastMethod,
-        }),
-      }
-    );
+    try {
+      const response = await fetch(
+        "https://dream-eyyq.onrender.com/api/interpret",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            dreamText: dreamText, // הטקסט המעודכן בבועת המשתמש
+            category: lastCategory,
+            method: lastMethod,
+            language, // ⭐ גם כאן שולחים שפה
+          }),
+        }
+      );
 
-    const data = await response.json();
+      const data = await response.json();
 
-    // מסירים את ההודעה הזמנית
-    setMessages((prev) => {
-      const withoutTemp = prev.filter((m) => !m.temp);
+      // מסירים את ההודעה הזמנית
+      setMessages((prev) => {
+        const withoutTemp = prev.filter((m) => !m.temp);
 
-      if (!response.ok || !data.interpretation) {
-        // במקרה של שגיאה – כן נוסיף הודעת system חדשה
+        if (!response.ok || !data.interpretation) {
+          // במקרה של שגיאה – כן נוסיף הודעת system חדשה
+          return [
+            ...withoutTemp,
+            {
+              id: Date.now() + Math.random(),
+              type: "system",
+              text:
+                data.error ||
+                t("chat.system.error.couldNotInterpret"),
+            },
+          ];
+        }
+
+        // ✅ כאן הקסם: מעדכנים את *הפירוש האחרון הקיים* במקום ליצור חדש
+        const updated = [...withoutTemp];
+
+        // מוצאים את האינדקס של הודעת ה-system האחרונה (שאינה temp)
+        const lastSystemIndexFromEnd = [...updated]
+          .reverse()
+          .findIndex((m) => m.type === "system");
+
+        if (lastSystemIndexFromEnd === -1) {
+          // אם אין הודעת system – נוסיף חדשה כ־fallback
+          updated.push({
+            id: Date.now() + Math.random(),
+            type: "system",
+            text: data.interpretation,
+            title: data.title,
+            methodUsed: data.methodUsed,
+            tags: data.tags,
+          });
+          return updated;
+        }
+
+        const realIndex = updated.length - 1 - lastSystemIndexFromEnd;
+
+        // מעדכנים את ההודעה הקיימת בפירוש החדש
+        updated[realIndex] = {
+          ...updated[realIndex],
+          text: data.interpretation,
+          title: data.title,
+          methodUsed: data.methodUsed,
+          tags: data.tags,
+        };
+
+        return updated;
+      });
+    } catch (err) {
+      console.error(err);
+      setMessages((prev) => {
+        const withoutTemp = prev.filter((m) => !m.temp);
         return [
           ...withoutTemp,
           {
             id: Date.now() + Math.random(),
             type: "system",
-            text:
-              data.error ||
-              "Sorry, I couldn’t interpret your dream right now. Please try again.",
+            text: t("chat.system.error.generic"),
           },
         ];
-      }
-
-      // ✅ כאן הקסם: מעדכנים את *הפירוש האחרון הקיים* במקום ליצור חדש
-      const updated = [...withoutTemp];
-
-      // מוצאים את האינדקס של הודעת ה-system האחרונה (שאינה temp)
-      const lastSystemIndexFromEnd = [...updated]
-        .reverse()
-        .findIndex((m) => m.type === "system");
-
-      if (lastSystemIndexFromEnd === -1) {
-        // אם מסיבה כלשהי אין הודעת system – נוסיף חדשה כfallback
-        updated.push({
-          id: Date.now() + Math.random(),
-          type: "system",
-          text: data.interpretation,
-          title: data.title,
-          methodUsed: data.methodUsed,
-          tags: data.tags,
-        });
-        return updated;
-      }
-
-      const realIndex = updated.length - 1 - lastSystemIndexFromEnd;
-
-      // מעדכנים את ההודעה הקיימת בפירוש החדש
-      updated[realIndex] = {
-        ...updated[realIndex],
-        text: data.interpretation,
-        title: data.title,
-        methodUsed: data.methodUsed,
-        tags: data.tags,
-      };
-
-      return updated;
-    });
-  } catch (err) {
-    console.error(err);
-    setMessages((prev) => {
-      const withoutTemp = prev.filter((m) => !m.temp);
-      return [
-        ...withoutTemp,
-        {
-          id: Date.now() + Math.random(),
-          type: "system",
-          text: "Something went wrong while interpreting your dream.",
-        },
-      ];
-    });
-  } finally {
-    setIsLoading(false);
-    setFlowStep("idle");
-    setIsEditingDream(false);
-  }
-};
-
+      });
+    } finally {
+      setIsLoading(false);
+      setFlowStep("idle");
+      setIsEditingDream(false);
+    }
+  };
 
   const handleKeyDown = (e) => {
     if (e.key === "Enter") {
@@ -275,6 +296,7 @@ const handleSendAgain = async () => {
                       isLoading={isLoading}
                       lastCategory={lastCategory}
                       lastMethod={lastMethod}
+                      // אפשר בהמשך להעביר גם t אם צריך
                     />
                   ) : (
                     // כל ההודעות האחרות – טקסט רגיל
@@ -292,6 +314,7 @@ const handleSendAgain = async () => {
                           )
                         );
                       }}
+                      // גם כאן אפשר להעביר t אם צריך
                     />
                   )}
                 </div>
@@ -304,6 +327,7 @@ const handleSendAgain = async () => {
               selectedCategoryId={selectedCategoryId}
               onCategorySelect={handleCategorySelect}
               onMethodSelect={handleMethodSelect}
+              // אם תרצה – אפשר להוסיף כאן t ולהשתמש בו בתוך הקומפוננטה
             />
           )}
 
@@ -321,8 +345,8 @@ const handleSendAgain = async () => {
               type="text"
               placeholder={
                 isLoading
-                  ? "Interpreting your dream..."
-                  : "Type your dream here..."
+                  ? t("chat.input.placeholder.loading")
+                  : t("chat.input.placeholder.default")
               }
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
@@ -335,20 +359,11 @@ const handleSendAgain = async () => {
             </button>
           </div>
 
-          <nav className="bottom-nav">
-            <button className="nav-item">
-              <span className="nav-icon">📓</span>
-              <span className="nav-label">diary</span>
-            </button>
-            <button className="nav-item nav-item-active">
-              <span className="nav-icon">◯</span>
-              <span className="nav-label">interpretation</span>
-            </button>
-            <button className="nav-item">
-              <span className="nav-icon">👤</span>
-              <span className="nav-label">profile</span>
-            </button>
-          </nav>
+          <BottomNav
+            currentScreen={currentScreen || "interpretation"}
+            onChangeScreen={onChangeScreen}
+            t={t} // ⭐ התרגום של הניווט בא מהקונטקסט
+          />
         </div>
       </div>
     </div>

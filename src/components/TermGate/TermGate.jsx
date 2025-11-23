@@ -2,8 +2,15 @@
 import React, { useState } from "react";
 import NoConsentPage from "./NoConsentPage";
 
+// ✨ תרגום
+import { useTranslation } from "../../TranslationContext";
+import LanguageSwitcher from "../LanguageSwitcher/LanguageSwitcher";
+
 function TermGate({ onAccept }) {
   const [declined, setDeclined] = useState(false);
+
+  // הוספה: שימוש בפונקציית התרגום
+  const { t } = useTranslation();
 
   // אם המשתמש/ת לחץ "אינני מסכים/ה" – עוברים למסך מידע בלבד
   if (declined) {
@@ -13,31 +20,33 @@ function TermGate({ onAccept }) {
   return (
     <div className="terms-wrapper">
       <div className="terms-card">
-   <h1>Terms of Use</h1>
+        <h1>{t("terms.title")}</h1>
 
-<p>
-Before using the dream analysis app, it is important to us that you understand the nature of the service:
-</p>
+        {/* בורר שפה – בלי לשנות את המבנה הקיים, רק מוסיפים שורה */}
+        <LanguageSwitcher />
 
-<ul>
-<li>
-The service is experiential and creative only, and does not constitute therapeutic, medical or psychological advice.
-</li>
-<li>
-Dreams are saved only on your device (in the browser), and are not saved on our server.
-</li>
-<li>
-We do not guarantee the accuracy, completeness or specific result of the interpretation.
-</li>
-<li>
-Use of the app is the sole responsibility of the user.
-</li>
-</ul>
+        <p>
+          {t("terms.intro")}
+        </p>
 
-    <p>
-By clicking &quot;I accept the Terms of Use&quot; you acknowledge that you have read
-and understood the terms, and agree to continue using the application.
-</p>
+        <ul>
+          <li>
+            {t("terms.points.experientialOnly")}
+          </li>
+          <li>
+            {t("terms.points.localStorageOnly")}
+          </li>
+          <li>
+            {t("terms.points.noGuarantee")}
+          </li>
+          <li>
+            {t("terms.points.userResponsibility")}
+          </li>
+        </ul>
+
+        <p>
+          {t("terms.consentNote")}
+        </p>
 
         <div className="terms-actions">
           {/* זה הכפתור שצריך להעביר לצ'ט */}
@@ -46,7 +55,8 @@ and understood the terms, and agree to continue using the application.
             className="terms-button accept bg-violet-100"
             onClick={onAccept}
           >
-I agree to the terms of use.          </button>
+            {t("terms.buttons.accept")}
+          </button>
 
           {/* זה הכפתור שמוביל למסך "לא מסכים" */}
           <button
@@ -54,7 +64,8 @@ I agree to the terms of use.          </button>
             className="terms-button decline"
             onClick={() => setDeclined(true)}
           >
-I do not agree.          </button>
+            {t("terms.buttons.decline")}
+          </button>
         </div>
       </div>
     </div>

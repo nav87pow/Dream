@@ -1,43 +1,72 @@
-// src/App.js
 import React, { useEffect, useState } from "react";
 import "./App.css";
 
-import TermGate from "./components/TermGate/TermGate";
 import DreamChat from "./components/DreamChat";
+import TermGate from "./components/TermGate/TermGate";
+import Profile from "./components/Profile/Profile";
+import { TranslationProvider } from "./TranslationContext";
 
 function App() {
-  // ברירת מחדל: עדיין לא קיבלנו הסכמה
+  const [dreams, setDreams] = useState(() => {
+    try {
+      const saved = localStorage.getItem("dreams");
+      if (saved) {
+        return JSON.parse(saved);
+      }
+    } catch (error) {
+      console.warn("Failed to load dreams:", error);
+    }
+    return [];
+  });
+
   const [tosAccepted, setTosAccepted] = useState(false);
-  // כדי לא להציג כלום עד שנסיים לבדוק localStorage
   const [checkedStorage, setCheckedStorage] = useState(false);
 
+  // מסך נוכחי: interpretation / profile (ובהמשך אולי diary)
+  const [screen, setScreen] = useState("interpretation");
+
   useEffect(() => {
-    // קורא פעם אחת כשאפליקציה נטענת
     const stored = localStorage.getItem("tosAccepted");
-    if (stored === "yes") {
+    if (stored === "true") {
       setTosAccepted(true);
     }
     setCheckedStorage(true);
   }, []);
 
   const handleAccept = () => {
-    // כשמשתמש מאשר תנאים
-    localStorage.setItem("tosAccepted", "yes");
+    localStorage.setItem("tosAccepted", "true");
     setTosAccepted(true);
   };
 
-  // עד שלא סיימנו לבדוק localStorage – לא מציגים כלום (מונע קפיצה מסך)
+  const addDream = (newDream) => {
+    const updated = [...dreams, newDream];
+    setDreams(updated);
+    localStorage.setItem("dreams", JSON.stringify(updated));
+  };
+
   if (!checkedStorage) {
     return null;
   }
 
-  // אם המשתמש עדיין לא הסכים – מציגים את מסך תנאי השימוש
-  if (!tosAccepted) {
-    return <TermGate onAccept={handleAccept} />;
-  }
-
-  // אם המשתמש הסכים – מציגים את מסך הצ'ט
-  return <DreamChat />;
+  return (
+    <TranslationProvider>
+      {!tosAccepted ? (
+        <TermGate onAccept={handleAccept} />
+      ) : screen === "profile" ? (
+        <Profile
+          currentScreen={screen}
+          onChangeScreen={setScreen}
+        />
+      ) : (
+        <DreamChat
+          currentScreen={screen}
+          onChangeScreen={setScreen}
+          dreams={dreams}
+          addDream={addDream}
+        />
+      )}
+    </TranslationProvider>
+  );
 }
 
 export default App;
