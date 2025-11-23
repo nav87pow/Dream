@@ -60,7 +60,7 @@ app.post("/api/interpret", async (req, res) => {
 
     // ⭐ systemPrompt – שמירה על הרוח שלך + דרישה ל-JSON עם methodUsed
     const systemPrompt = `
-    You are a dream interpreter.
+You are a dream interpreter.
 Always respond in ${langName}.
 You are an AI system that provides a one-time, standalone dream interpretation
 strictly according to the category and method selected by the user. Your task is
@@ -91,6 +91,10 @@ IMPORTANT OUTPUT RULES:
   }
 }
 
+Content rules:
+- "interpretation" should be concise: up to 4 short paragraphs total (max ~400–500 words).
+- Focus only on the dream content, not on the dreamer as a person.
+
 Do NOT include ANY text before or after this JSON.
     `.trim();
 
@@ -113,7 +117,7 @@ Adaptive depth rule:
 - If the dream is very short or minimal (e.g., one line or one scene),
   provide a concise interpretation (1–2 paragraphs).
 - If the dream contains multiple elements, symbolism, or narrative structure,
-  give a more detailed interpretation (up to 4–5 paragraphs).
+  give a more detailed interpretation (up to 3–4 paragraphs total).
 
 Map your response into the JSON fields described in the system message:
 - "methodUsed" = the method or framework you used for this interpretation.
@@ -129,8 +133,10 @@ Map your response into the JSON fields described in the system message:
 
     const completion = await client.chat.completions.create({
       model: "llama-3.1-8b-instant",
-      // 👇 זה החלק שיכריח את Groq להחזיר JSON טהור
-      response_format: { type: "json_object" },
+      // ❌ הורדנו response_format כדי למנוע json_validate_failed מה־API
+      // response_format: { type: "json_object" },
+      max_tokens: 600,
+      temperature: 0.4,
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
@@ -266,7 +272,6 @@ No markdown, no commentary.
     return res.json({ translations: {} });
   }
 });
-
 
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {
