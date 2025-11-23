@@ -10,6 +10,31 @@ const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 
+// מפת קודי שפה לשם שפה אנושי – תואם 1:1 ל־LanguageSwitcher
+const LANGUAGE_NAMES = {
+  en: "English",
+  he: "Hebrew",
+  hu: "Hungarian",
+  pt: "Portuguese",
+  es: "Spanish",
+  ro: "Romanian",
+  de: "German",
+  it: "Italian",
+  fr: "French",
+  et: "Estonian",
+  ru: "Russian",
+  uk: "Ukrainian",
+  ar: "Arabic",
+  pl: "Polish",
+  is: "Icelandic",
+  el: "Greek",
+  cs: "Czech",
+  no: "Norwegian",
+  fi: "Finnish",
+  sv: "Swedish",
+  ja: "Japanese",   // ← חדש
+};
+
 const client = new Groq({
   apiKey: process.env.GROQ_API_KEY,
 });
@@ -18,14 +43,23 @@ app.post("/api/interpret", async (req, res) => {
   try {
     console.log("Incoming body:", req.body);
 
-    const { dreamText, category, method } = req.body;
+    const { dreamText, category, method, language } = req.body;
 
     if (!dreamText || !dreamText.trim()) {
       return res.status(400).json({ error: "Dream text is required" });
     }
+// language מגיע מהפרונט (למשל "he" או "en")
+const langCode = (language || "en").toLowerCase();
 
+// שם השפה שהמודל יבין טוב יותר
+const langName =
+  LANGUAGE_NAMES[langCode] ||
+  LANGUAGE_NAMES[langCode.slice(0, 2)] ||
+  "English";
     // ⭐ systemPrompt – שמירה על הרוח שלך + דרישה ל-JSON עם methodUsed
     const systemPrompt = `
+    You are a dream interpreter.
+Always respond in ${langName}.
 You are an AI system that provides a one-time, standalone dream interpretation
 strictly according to the category and method selected by the user. Your task is
 to produce a structured, method-based interpretation without offering advice,
@@ -150,8 +184,80 @@ Map your response into the JSON fields described in the system message:
     });
   }
 });
+// ⭐ endpoint לתרגום טקסטים של הממשק – יציב וסלחני
+app.post("/api/translate", async (req, res) => {
+  try {
+    const {
+      targetLanguage,
+      sourceLanguage = "en",
+      texts = [],
+    } = req.body;
+
+    // אם הגוף לא תקין – לא מפילים את האפליקציה
+    if (!targetLanguage || !Array.isArray(texts) || texts.length === 0) {
+      console.error("Bad translate request body:", req.body);
+      return res.json({ translations: {} });
+    }
+
+    const systemPrompt = `
+You are a translation engine. 
+Translate ONLY the "text" field for each item.
+Keep the same keys.
+Translate from ${sourceLanguage} to ${targetLanguage}.
+Return ONLY valid JSON in this exact shape:
+{
+  "translations": {
+    "<key>": "<translated text>"
+  }
+}
+No markdown, no commentary.
+`.trim();
+
+    const userPayload = JSON.stringify({ texts });
+
+    const completion = await client.chat.completions.create({
+      model: "llama-3.1-8b-instant",
+      response_format: { type: "json_object" },
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPayload },
+      ],
+      temperature: 0.2,
+    });
+
+    const raw = completion.choices?.[0]?.message?.content || "{}";
+    console.log("RAW TRANSLATION FROM MODEL:", raw);
+
+    let translationsMap = {};
+
+    try {
+      const parsed = JSON.parse(raw);
+
+      if (parsed && typeof parsed === "object") {
+        if (parsed.translations && typeof parsed.translations === "object") {
+          // המקרה הרגיל – מה שביקשנו
+          translationsMap = parsed.translations;
+        } else {
+          // fallback – אם המודל החזיר ישר map של key -> text
+          translationsMap = parsed;
+        }
+      }
+    } catch (err) {
+      console.error("Failed to parse JSON returned by the model:", err);
+      translationsMap = {};
+    }
+
+    // תמיד מחזירים 200 – במקרה הכי גרוע אין תרגומים, נשארים באנגלית
+    return res.json({ translations: translationsMap });
+  } catch (err) {
+    console.error("Translation API error:", err?.response?.data || err);
+    return res.json({ translations: {} });
+  }
+});
+
 
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {
   console.log(`Server listening on port ${PORT}`);
 });
+
