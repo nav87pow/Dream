@@ -2,22 +2,19 @@
 import React, { useState, useEffect } from "react";
 import CategoryStep from "./categories/CategoryStep";
 import TagsList from "./tags/TagsList";
-import EditableUserBubble from "./EditableUserBubble";
+// import EditableUserBubble from "./EditableUserBubble"; // גיבוי – כרגע לא בשימוש
 import BottomNav from "./BottomNav/BottomNav";
 import { useTranslation } from "../TranslationContext";
 import DreamInputCard from "./DreamInputCard/DreamInputCard";
-// כתובת השרת שמדבר עם Groq (מקומי)
-const API_URL = "http://localhost:4000/api/interpret";
-// כשתרצה לעבוד מול Render:
- //const API_URL = "https://dream-eyyq.onrender.com/api/interpret";
+
+// const API_URL = "http://localhost:4000/api/interpret";
+const API_URL = "https://dream-eyyq.onrender.com/api/interpret";
 
 function DreamChat({ currentScreen, onChangeScreen }) {
-  // ⭐ לוקחים גם t וגם language מהקונטקסט
   const { language, t } = useTranslation();
 
   const [inputValue, setInputValue] = useState("");
 
-  // הודעת ברוך הבא – שומרת key כדי שנוכל לעדכן כשמשנים שפה
   const [messages, setMessages] = useState(() => [
     {
       id: 1,
@@ -34,17 +31,14 @@ function DreamChat({ currentScreen, onChangeScreen }) {
   const [pendingDreamText, setPendingDreamText] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  // טקסט החלום האחרון של המשתמש (לעריכה בבועה)
   const [dreamText, setDreamText] = useState("");
 
-  // האם הבועה כרגע במצב עריכה?
+  // eslint-disable-next-line no-unused-vars
   const [isEditingDream, setIsEditingDream] = useState(false);
 
-  // שמירת הבחירה האחרונה של קטגוריה ושיטה (ל-send again)
   const [lastCategory, setLastCategory] = useState(null);
   const [lastMethod, setLastMethod] = useState(null);
 
-  // ⭐ אם השפה משתנה – מעדכן את הודעת ה-welcome לפי t()
   useEffect(() => {
     setMessages((prev) =>
       prev.map((m) =>
@@ -61,6 +55,8 @@ function DreamChat({ currentScreen, onChangeScreen }) {
       { id: Date.now() + Math.random(), ...msg },
     ]);
 
+  // גיבוי – שליחה דרך input הישן (לא בשימוש כרגע)
+  // eslint-disable-next-line no-unused-vars
   const handleSend = async () => {
     const trimmed = inputValue.trim();
     if (!trimmed || isLoading) return;
@@ -70,7 +66,6 @@ function DreamChat({ currentScreen, onChangeScreen }) {
     addMessage({ type: "user", text: trimmed });
     setInputValue("");
 
-    // נשמור את הטקסט גם לסטייט העריכה בבועה
     setDreamText(trimmed);
     setIsEditingDream(false);
     setLastCategory(null);
@@ -81,25 +76,21 @@ function DreamChat({ currentScreen, onChangeScreen }) {
     setSelectedMethodId(null);
     setFlowStep("category");
   };
-  // שליחה דרך הכרטיס החדש (DreamInputCard) בלי לפגוע ב-input הישן
-   // שליחה דרך הכרטיס החדש (DreamInputCard)
-  // אם כבר יש lastCategory + lastMethod → נתנהג כמו "send again"
-  // אם אין → נפתח בחירת קטגוריה/שיטה כמו ב-handleSend הרגיל
+
+  // שליחה מתוך הכרטיס החדש
   const handleSendFromCard = async (textFromCard) => {
     const trimmed = (textFromCard || "").trim();
     if (!trimmed || isLoading) return;
 
     if (flowStep === "category" || flowStep === "method") return;
 
-    // 🔁 מצב 1 – יש כבר קטגוריה ושיטה אחרונות → עדכון פירוש קיים
+    // מצב 1 – כבר יש קטגוריה ושיטה → עדכון פירוש אחרון
     if (lastCategory && lastMethod) {
-      // נסנכרן את הסטייט של החלום לערך החדש מהכרטיס
       setDreamText(trimmed);
 
       setIsLoading(true);
       setFlowStep("interpreting");
 
-      // הודעת ביניים זמנית – כמו ב-handleSendAgain
       addMessage({
         type: "system",
         text: t("chat.system.interpretingUpdated"),
@@ -126,7 +117,6 @@ function DreamChat({ currentScreen, onChangeScreen }) {
           const withoutTemp = prev.filter((m) => !m.temp);
 
           if (!response.ok || !data.interpretation) {
-            // במקרה של שגיאה – נוסיף הודעת system חדשה
             return [
               ...withoutTemp,
               {
@@ -139,9 +129,7 @@ function DreamChat({ currentScreen, onChangeScreen }) {
             ];
           }
 
-          // כמו ב-handleSendAgain: מעדכן את הפירוש האחרון במקום ליצור חדש
           const updated = [...withoutTemp];
-
           const lastSystemIndexFromEnd = [...updated]
             .reverse()
             .findIndex((m) => m.type === "system");
@@ -189,15 +177,11 @@ function DreamChat({ currentScreen, onChangeScreen }) {
         setIsEditingDream(false);
       }
 
-      // חשוב: במצב הזה אנחנו *לא* פותחים שוב בחירת קטגוריה
       return;
     }
 
-    // 🆕 מצב 2 – אין עוד קטגוריה/שיטה → כמו handleSend הרגיל (חלום חדש)
+    // מצב 2 – פירוש חדש (אין קטגוריה/שיטה אחרונות)
     addMessage({ type: "user", text: trimmed });
-
-    // כאן אנחנו לא נוגעים ב-inputValue כי זה השדה הישן
-    // setInputValue("");
 
     setDreamText(trimmed);
     setIsEditingDream(false);
@@ -209,7 +193,6 @@ function DreamChat({ currentScreen, onChangeScreen }) {
     setSelectedMethodId(null);
     setFlowStep("category");
   };
-
 
   const handleCategorySelect = (categoryId) => {
     setSelectedCategoryId(categoryId);
@@ -224,7 +207,6 @@ function DreamChat({ currentScreen, onChangeScreen }) {
     setFlowStep("interpreting");
     setIsLoading(true);
 
-    // נשמור גם את הבחירות האחרונות ל-send again
     setLastCategory(selectedCategoryId);
     setLastMethod(methodId);
 
@@ -244,7 +226,7 @@ function DreamChat({ currentScreen, onChangeScreen }) {
           dreamText: pendingDreamText,
           category: selectedCategoryId,
           method: methodId,
-          language, // ⭐ שולחים גם שפה לשרת
+          language,
         }),
       });
 
@@ -264,7 +246,7 @@ function DreamChat({ currentScreen, onChangeScreen }) {
           text: data.interpretation,
           title: data.title,
           methodUsed: data.methodUsed,
-          tags: data.tags, // 👈 זה מה שמאפשר ל־TagsList לעבוד
+          tags: data.tags,
         });
       }
     } catch (err) {
@@ -281,14 +263,14 @@ function DreamChat({ currentScreen, onChangeScreen }) {
     }
   };
 
-  // פירוש חדש בהתאם לעריכה של החלום בבועה
+  // eslint-disable-next-line no-unused-vars
   const handleSendAgain = async () => {
-    if (!dreamText.trim() || !lastCategory || !lastMethod || isLoading) return;
+    if (!dreamText.trim() || !lastCategory || !lastMethod || isLoading)
+      return;
 
     setIsLoading(true);
     setFlowStep("interpreting");
 
-    // הודעת "ביניים" זמנית
     addMessage({
       type: "system",
       text: t("chat.system.interpretingUpdated"),
@@ -304,22 +286,20 @@ function DreamChat({ currentScreen, onChangeScreen }) {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            dreamText: dreamText, // הטקסט המעודכן בבועת המשתמש
+            dreamText: dreamText,
             category: lastCategory,
             method: lastMethod,
-            language, // ⭐ גם כאן שולחים שפה
+            language,
           }),
         }
       );
 
       const data = await response.json();
 
-      // מסירים את ההודעה הזמנית
       setMessages((prev) => {
         const withoutTemp = prev.filter((m) => !m.temp);
 
         if (!response.ok || !data.interpretation) {
-          // במקרה של שגיאה – כן נוסיף הודעת system חדשה
           return [
             ...withoutTemp,
             {
@@ -332,16 +312,12 @@ function DreamChat({ currentScreen, onChangeScreen }) {
           ];
         }
 
-        // ✅ כאן הקסם: מעדכנים את *הפירוש האחרון הקיים* במקום ליצור חדש
         const updated = [...withoutTemp];
-
-        // מוצאים את האינדקס של הודעת ה-system האחרונה (שאינה temp)
         const lastSystemIndexFromEnd = [...updated]
           .reverse()
           .findIndex((m) => m.type === "system");
 
         if (lastSystemIndexFromEnd === -1) {
-          // אם אין הודעת system – נוסיף חדשה כ־fallback
           updated.push({
             id: Date.now() + Math.random(),
             type: "system",
@@ -355,7 +331,6 @@ function DreamChat({ currentScreen, onChangeScreen }) {
 
         const realIndex = updated.length - 1 - lastSystemIndexFromEnd;
 
-        // מעדכנים את ההודעה הקיימת בפירוש החדש
         updated[realIndex] = {
           ...updated[realIndex],
           text: data.interpretation,
@@ -386,6 +361,8 @@ function DreamChat({ currentScreen, onChangeScreen }) {
     }
   };
 
+  // גיבוי – קיצור מקלדת ל-input הישן
+  // eslint-disable-next-line no-unused-vars
   const handleKeyDown = (e) => {
     if (e.key === "Enter") {
       e.preventDefault();
@@ -393,62 +370,36 @@ function DreamChat({ currentScreen, onChangeScreen }) {
     }
   };
 
-  // מזהים את ההודעה האחרונה מסוג user
-  const lastUserMessage = [...messages].reverse().find((m) => m.type === "user");
-  const lastUserMessageId = lastUserMessage ? lastUserMessage.id : null;
-
   return (
     <div className="app-root">
       <div className="phone-frame">
         <div className="chat-screen">
           <div className="messages-area">
-            {messages.map((msg) => {
-              const isLastUser =
-                msg.type === "user" && msg.id === lastUserMessageId;
-
-              return (
+            {/* מציגים רק הודעות system – בועות user מוסתרות */}
+            {messages
+              .filter((msg) => msg.type === "system")
+              .map((msg) => (
                 <div
                   key={msg.id}
-                  className={`message-bubble ${
-                    msg.type === "system" ? "system" : "user"
-                  }`}
+                  className="message-bubble system"
                 >
-                  {/* בועת המשתמש האחרונה – עם עריכה + send again */}
-                  {isLastUser ? (
-                    <EditableUserBubble
-                      message={msg}
-                      dreamText={dreamText}
-                      setDreamText={setDreamText}
-                      isEditingDream={isEditingDream}
-                      setIsEditingDream={setIsEditingDream}
-                      onSendAgain={handleSendAgain}
-                      isLoading={isLoading}
-                      lastCategory={lastCategory}
-                      lastMethod={lastMethod}
-                      // אפשר בהמשך להעביר גם t אם צריך
-                    />
-                  ) : (
-                    // כל ההודעות האחרות – טקסט רגיל
-                    <>{msg.text}</>
-                  )}
-
-                  {/* תגיות מתחת להודעות ה-system עם tags */}
-                  {msg.type === "system" && msg.tags && (
+                  {msg.text}
+                  {msg.tags && (
                     <TagsList
                       tags={msg.tags}
                       setTags={(updatedTags) => {
                         setMessages((prev) =>
                           prev.map((m) =>
-                            m.id === msg.id ? { ...m, tags: updatedTags } : m
+                            m.id === msg.id
+                              ? { ...m, tags: updatedTags }
+                              : m
                           )
                         );
                       }}
-                      // גם כאן אפשר להעביר t אם צריך
                     />
                   )}
                 </div>
-              );
-            })}
+              ))}
           </div>
 
           {(flowStep === "category" || flowStep === "method") && (
@@ -456,10 +407,13 @@ function DreamChat({ currentScreen, onChangeScreen }) {
               selectedCategoryId={selectedCategoryId}
               onCategorySelect={handleCategorySelect}
               onMethodSelect={handleMethodSelect}
-              // אם תרצה – אפשר להוסיף כאן t ולהשתמש בו בתוך הקומפוננטה
             />
           )}
-<DreamInputCard onSend={handleSendFromCard} />
+
+          <DreamInputCard onSend={handleSendFromCard} />
+
+          {/* גיבוי – input ישן, לא בשימוש */}
+          {/*
           <div className="input-bar">
             <button
               className="input-icon-button send"
@@ -469,8 +423,7 @@ function DreamChat({ currentScreen, onChangeScreen }) {
               &lt;
             </button>
 
-              {/* ===== input bar הישן – נשמר כקוד אבל לא מוצג ב-UI ===== */}
-          {/*<input
+            <input
               className="input-field"
               type="text"
               placeholder={
@@ -483,18 +436,17 @@ function DreamChat({ currentScreen, onChangeScreen }) {
               onKeyDown={handleKeyDown}
               disabled={isLoading}
             />
-          
 
             <button className="input-icon-button mic" disabled={isLoading}>
               🎙
             </button>
-          </div>          */}
-
+          </div>
+          */}
 
           <BottomNav
             currentScreen={currentScreen || "interpretation"}
             onChangeScreen={onChangeScreen}
-            t={t} // ⭐ התרגום של הניווט בא מהקונטקסט
+            t={t}
           />
         </div>
       </div>
