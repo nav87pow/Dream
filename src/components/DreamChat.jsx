@@ -7,9 +7,9 @@ import BottomNav from "./BottomNav/BottomNav";
 import { useTranslation } from "../TranslationContext";
 import DreamInputCard from "./DreamInputCard/DreamInputCard";
 // כתובת השרת שמדבר עם Groq (מקומי)
-//const API_URL = "http://localhost:4000/api/interpret";
+const API_URL = "http://localhost:4000/api/interpret";
 // כשתרצה לעבוד מול Render:
- const API_URL = "https://dream-eyyq.onrender.com/api/interpret";
+ //const API_URL = "https://dream-eyyq.onrender.com/api/interpret";
 
 function DreamChat({ currentScreen, onChangeScreen }) {
   // ⭐ לוקחים גם t וגם language מהקונטקסט
@@ -469,7 +469,8 @@ function DreamChat({ currentScreen, onChangeScreen }) {
               &lt;
             </button>
 
-            <input
+              {/* ===== input bar הישן – נשמר כקוד אבל לא מוצג ב-UI ===== */}
+          {/*<input
               className="input-field"
               type="text"
               placeholder={
@@ -487,7 +488,8 @@ function DreamChat({ currentScreen, onChangeScreen }) {
             <button className="input-icon-button mic" disabled={isLoading}>
               🎙
             </button>
-          </div>
+          </div>          */}
+
 
           <BottomNav
             currentScreen={currentScreen || "interpretation"}
