@@ -6,9 +6,10 @@ import TagsList from "./tags/TagsList";
 import BottomNav from "./BottomNav/BottomNav";
 import { useTranslation } from "../TranslationContext";
 import DreamInputCard from "./DreamInputCard/DreamInputCard";
+import { API_URL } from "../config/api"; // 👈 נוספה שורה זו
 
- //const API_URL = "http://localhost:4000/api/interpret";
-const API_URL = "https://dream-eyyq.onrender.com/api/interpret";
+//const API_URL = "http://localhost:4000/api/interpret";
+// const API_URL = "https://dream-eyyq.onrender.com/api/interpret";
 
 function DreamChat({ currentScreen, onChangeScreen }) {
   const { language, t } = useTranslation();
@@ -68,7 +69,7 @@ function DreamChat({ currentScreen, onChangeScreen }) {
 
     setDreamText(trimmed);
     setIsEditingDream(false);
-  
+
     setPendingDreamText(trimmed);
     setSelectedCategoryId(null);
     setSelectedMethodId(null);
