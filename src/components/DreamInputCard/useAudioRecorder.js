@@ -41,12 +41,20 @@ export default function useAudioRecorder(options = {}) {
   // הטקסט המלא האחרון שחושב ב-onresult
   const lastCombinedRef = useRef("");
 
+  // ✅ שומרים את הפונקציה ברפרנס, כדי שה-effect לא ירוץ כל רינדור
+  const callbackRef = useRef(onTranscriptionChunk);
+  useEffect(() => {
+    callbackRef.current = onTranscriptionChunk;
+  }, [onTranscriptionChunk]);
+
   useEffect(() => {
     const SpeechRecognition =
       window.SpeechRecognition || window.webkitSpeechRecognition;
 
     if (!SpeechRecognition) {
-      console.warn("[useAudioRecorder] SpeechRecognition is not supported in this browser.");
+      console.warn(
+        "[useAudioRecorder] SpeechRecognition is not supported in this browser."
+      );
       recognitionRef.current = null;
       return;
     }
@@ -88,15 +96,15 @@ export default function useAudioRecorder(options = {}) {
         combined,
       });
 
-      if (combined && typeof onTranscriptionChunk === "function") {
-        onTranscriptionChunk(combined);
+      const cb = callbackRef.current;
+      if (combined && typeof cb === "function") {
+        cb(combined);
       }
     };
 
     recognition.onerror = (e) => {
       // "aborted" קורה כשאנחנו בעצמנו קוראים stop() או מתחילים הקלטה חדשה
       if (e.error === "aborted") {
-        // לא שגיאה אמיתית – לא מציף את הקונסול
         console.log("[useAudioRecorder] onerror: aborted (expected stop)");
         return;
       }
@@ -133,17 +141,22 @@ export default function useAudioRecorder(options = {}) {
       try {
         recognition.stop();
       } catch (e) {
-        // מתעלמים משגיאת stop כפול
-        console.log("[useAudioRecorder] cleanup stop error (ignored):", e);
+        console.log(
+          "[useAudioRecorder] cleanup stop error (ignored):",
+          e
+        );
       }
       recognitionRef.current = null;
     };
-  }, [language, onTranscriptionChunk]);
+    // 🔴 שימי לב: לא תלוי יותר ב-onTranscriptionChunk
+  }, [language]);
 
   const startRecording = () => {
     const recognition = recognitionRef.current;
     if (!recognition) {
-      console.warn("[useAudioRecorder] startRecording: recognition not initialized");
+      console.warn(
+        "[useAudioRecorder] startRecording: recognition not initialized"
+      );
       return;
     }
 
@@ -155,56 +168,78 @@ export default function useAudioRecorder(options = {}) {
     try {
       recognition.lang =
         LANGUAGE_TO_LOCALE[language] || language || "en-US";
-      console.log("[useAudioRecorder] startRecording: calling recognition.start()", {
-        lang: recognition.lang,
-      });
+      console.log(
+        "[useAudioRecorder] startRecording: calling recognition.start()",
+        {
+          lang: recognition.lang,
+        }
+      );
       recognition.start();
       setRecordingState("recording");
     } catch (e) {
-      console.error("[useAudioRecorder] Failed to start recognition:", e);
+      console.error(
+        "[useAudioRecorder] Failed to start recognition:",
+        e
+      );
     }
   };
 
   const pauseRecording = () => {
     const recognition = recognitionRef.current;
     if (!recognition) {
-      console.warn("[useAudioRecorder] pauseRecording: recognition not initialized");
+      console.warn(
+        "[useAudioRecorder] pauseRecording: recognition not initialized"
+      );
       return;
     }
 
     manualPauseRef.current = true;
 
     try {
-      console.log("[useAudioRecorder] pauseRecording: calling recognition.stop()");
+      console.log(
+        "[useAudioRecorder] pauseRecording: calling recognition.stop()"
+      );
       recognition.stop();
       // onend יעדכן ל-"paused"
     } catch (e) {
-      console.error("[useAudioRecorder] Failed to pause recognition:", e);
+      console.error(
+        "[useAudioRecorder] Failed to pause recognition:",
+        e
+      );
     }
   };
 
   const resumeRecording = () => {
     const recognition = recognitionRef.current;
     if (!recognition) {
-      console.warn("[useAudioRecorder] resumeRecording: recognition not initialized");
+      console.warn(
+        "[useAudioRecorder] resumeRecording: recognition not initialized"
+      );
       return;
     }
 
     manualPauseRef.current = false;
 
     try {
-      console.log("[useAudioRecorder] resumeRecording: calling recognition.start()");
+      console.log(
+        "[useAudioRecorder] resumeRecording: calling recognition.start()"
+      );
       recognition.start();
       setRecordingState("recording");
     } catch (e) {
-      console.error("[useAudioRecorder] Failed to resume recognition:", e);
+      console.error(
+        "[useAudioRecorder] Failed to resume recognition:",
+        e
+      );
     }
   };
 
   const stopRecording = () => {
     const recognition = recognitionRef.current;
     if (!recognition) {
-      console.warn("[useAudioRecorder] stopRecording: recognition not initialized");
+      console.warn(
+        "[useAudioRecorder] stopRecording: recognition not initialized"
+      );
       return;
     }
 
@@ -212,10 +247,15 @@ export default function useAudioRecorder(options = {}) {
     manualPauseRef.current = false;
 
     try {
-      console.log("[useAudioRecorder] stopRecording: calling recognition.stop()");
+      console.log(
+        "[useAudioRecorder] stopRecording: calling recognition.stop()"
+      );
       recognition.stop();
     } catch (e) {
-      console.error("[useAudioRecorder] Failed to stop recognition:", e);
+      console.error(
+        "[useAudioRecorder] Failed to stop recognition:",
+        e
+      );
     }
 
     setRecordingState("idle");
