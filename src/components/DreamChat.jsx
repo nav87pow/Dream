@@ -7,7 +7,7 @@ import BottomNav from "./BottomNav/BottomNav";
 import { useTranslation } from "../TranslationContext";
 import DreamInputCard from "./DreamInputCard/DreamInputCard";
 
-// const API_URL = "http://localhost:4000/api/interpret";
+ //const API_URL = "http://localhost:4000/api/interpret";
 const API_URL = "https://dream-eyyq.onrender.com/api/interpret";
 
 function DreamChat({ currentScreen, onChangeScreen }) {
@@ -68,9 +68,7 @@ function DreamChat({ currentScreen, onChangeScreen }) {
 
     setDreamText(trimmed);
     setIsEditingDream(false);
-    setLastCategory(null);
-    setLastMethod(null);
-
+  
     setPendingDreamText(trimmed);
     setSelectedCategoryId(null);
     setSelectedMethodId(null);
@@ -374,6 +372,7 @@ function DreamChat({ currentScreen, onChangeScreen }) {
     <div className="app-root">
       <div className="phone-frame">
         <div className="chat-screen">
+
           <div className="messages-area">
             {/* מציגים רק הודעות system – בועות user מוסתרות */}
             {messages
@@ -399,7 +398,11 @@ function DreamChat({ currentScreen, onChangeScreen }) {
                     />
                   )}
                 </div>
-              ))}
+              ))
+              
+              }
+          <DreamInputCard onSend={handleSendFromCard} />
+
           </div>
 
           {(flowStep === "category" || flowStep === "method") && (
@@ -410,7 +413,6 @@ function DreamChat({ currentScreen, onChangeScreen }) {
             />
           )}
 
-          <DreamInputCard onSend={handleSendFromCard} />
 
           {/* גיבוי – input ישן, לא בשימוש */}
           {/*

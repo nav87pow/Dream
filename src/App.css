@@ -423,3 +423,54 @@ body {
 .wave-bar:nth-child(2) { animation-delay: 0.1s; }
 .wave-bar:nth-child(3) { animation-delay: 0.2s; }
 .wave-bar:nth-child(4) { animation-delay: 0.3s; }
+/* בסיס כללי */
+.wave-animation {
+  display: flex;
+  gap: 4px;
+  align-items: flex-end;
+  height: 16px;
+}
+
+.wave-animation .wave-bar {
+  width: 3px;
+  height: 100%;
+  border-radius: 999px;
+}
+
+/* אנימציה רק במצב הקלטה */
+.wave-recording .wave-bar {
+  animation: wave-pulse 0.8s infinite ease-in-out;
+  background-color: red; /* 👈 אדום רק כשמקליט */
+}
+
+/* במצב idle/paused – ללא אנימציה, בצבע נייטרלי */
+.wave-idle .wave-bar,
+.wave-paused .wave-bar {
+  animation: none;
+  background-color: #666; /* או שקוף/עדין יותר לפי העיצוב שלך */
+  opacity: 0.5;
+}
+
+/* אפשר גם להסתיר לגמרי במצב idle אם תרצה */
+.wave-idle .wave-bar {
+  opacity: 0.2;
+}
+
+/* keyframes לתנועה */
+@keyframes wave-pulse {
+  0% {
+    transform: scaleY(0.4);
+  }
+  25% {
+    transform: scaleY(1);
+  }
+  50% {
+    transform: scaleY(0.6);
+  }
+  75% {
+    transform: scaleY(0.9);
+  }
+  100% {
+    transform: scaleY(0.4);
+  }
+}
