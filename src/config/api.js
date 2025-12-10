@@ -1,8 +1,7 @@
-// src/config/api.js
 
-const isLocalhost =
-  window.location.hostname === "localhost" ||
-  window.location.hostname === "127.0.0.1";
+//const isLocalhost =
+//  window.location.hostname === "localhost" ||
+//  window.location.hostname === "127.0.0.1";
 
 //export const API_URL = isLocalhost
 //  ? "http://localhost:4000/api/interpret"
@@ -12,5 +11,9 @@ const isLocalhost =
 //  ? "http://localhost:4000/api/transcribe"
 //  : "https://dream-eyyq.onrender.com/api/transcribe";
 
-export const API_URL = "https://dream-eyyq.onrender.com/api/interpret";
-export const TRANSCRIBE_URL = "https://dream-eyyq.onrender.com/api/transcribe";
+
+export const API_URL =
+  "https://dream-eyyq.onrender.com/api/interpret";
+
+export const TRANSCRIBE_URL =
+  "https://dream-eyyq.onrender.com/api/transcribe";
