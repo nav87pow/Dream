@@ -1,6 +1,6 @@
-// src/components/DreamInputCard/useAudioRecorder.js
-import { useEffect, useRef, useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useTranslation } from "../../TranslationContext";
+import { TRANSCRIBE_URL } from "../../config/api";
 
 // מיפוי קוד שפה -> לוקאל של הדפדפן
 const LANGUAGE_TO_LOCALE = {
@@ -27,242 +27,221 @@ const LANGUAGE_TO_LOCALE = {
   ja: "ja-JP",
 };
 
+
+// שליחת Blob של אודיו לשרת וקבלת טקסט בחזרה
+async function uploadAndTranscribe(blob, language) {
+  const formData = new FormData();
+  formData.append("file", blob, "recording.webm");
+
+  if (language) {
+    formData.append("language", language.toLowerCase());
+  }
+
+  const response = await fetch(TRANSCRIBE_URL, {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!response.ok) {
+    console.error(
+      "[useAudioRecorder] Transcribe request failed:",
+      response.status
+    );
+    return "";
+  }
+
+  try {
+    const data = await response.json();
+    return data.text || "";
+  } catch (e) {
+    console.error("[useAudioRecorder] Failed to parse transcription JSON:", e);
+    return "";
+  }
+}
+
+
+
+
 export default function useAudioRecorder(options = {}) {
   const { onTranscriptionChunk } = options;
   const { language } = useTranslation();
 
-  const [recordingState, setRecordingState] = useState("idle"); // "idle" | "recording" | "paused"
+  const mediaRecorderRef = useRef(null);
+  const streamRef = useRef(null);
+  const chunksRef = useRef([]);
 
-  const recognitionRef = useRef(null);
-  const manualPauseRef = useRef(false);
-
-  // טקסט שכבר נאמר ונשמר בין פאוזים
-  const recognizedSoFarRef = useRef("");
-  // הטקסט המלא האחרון שחושב ב-onresult
-  const lastCombinedRef = useRef("");
-
-  // ✅ שומרים את הפונקציה ברפרנס, כדי שה-effect לא ירוץ כל רינדור
+  // שומרים את callback ברפרנס כדי לא להיתקע על סגירה ישנה
   const callbackRef = useRef(onTranscriptionChunk);
   useEffect(() => {
     callbackRef.current = onTranscriptionChunk;
   }, [onTranscriptionChunk]);
 
-  useEffect(() => {
-    const SpeechRecognition =
-      window.SpeechRecognition || window.webkitSpeechRecognition;
-
-    if (!SpeechRecognition) {
+  const startRecording = async () => {
+    // אם כבר יש הקלטה פעילה – לא מתחילים שוב
+    if (mediaRecorderRef.current) {
       console.warn(
-        "[useAudioRecorder] SpeechRecognition is not supported in this browser."
-      );
-      recognitionRef.current = null;
-      return;
-    }
-
-    const recognition = new SpeechRecognition();
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    recognition.lang =
-      LANGUAGE_TO_LOCALE[language] || language || "en-US";
-
-    console.log("[useAudioRecorder] init recognition", {
-      lang: recognition.lang,
-      languageFromContext: language,
-    });
-
-    recognition.onresult = (event) => {
-      // כל מה שנאמר בסשן הנוכחי
-      let sessionText = "";
-
-      for (let i = 0; i < event.results.length; i++) {
-        const result = event.results[i];
-        const transcript = result[0].transcript;
-        sessionText += transcript + " ";
-      }
-
-      sessionText = sessionText.trim();
-
-      // טקסט מלא = מה שנאמר בסשנים קודמים + מה שנאמר עכשיו
-      const combined = (
-        recognizedSoFarRef.current +
-        (sessionText ? " " + sessionText : "")
-      ).trim();
-
-      lastCombinedRef.current = combined;
-
-      console.log("[useAudioRecorder] onresult", {
-        sessionText,
-        recognizedSoFar: recognizedSoFarRef.current,
-        combined,
-      });
-
-      const cb = callbackRef.current;
-      if (combined && typeof cb === "function") {
-        cb(combined);
-      }
-    };
-
-    recognition.onerror = (e) => {
-      // "aborted" קורה כשאנחנו בעצמנו קוראים stop() או מתחילים הקלטה חדשה
-      if (e.error === "aborted") {
-        console.log("[useAudioRecorder] onerror: aborted (expected stop)");
-        return;
-      }
-
-      console.error(
-        "[useAudioRecorder] Speech recognition error:",
-        e.error,
-        e.message || "",
-        e
-      );
-      setRecordingState("idle");
-    };
-
-    recognition.onend = () => {
-      console.log("[useAudioRecorder] onend", {
-        manualPause: manualPauseRef.current,
-        lastCombined: lastCombinedRef.current,
-      });
-
-      // שומרים מה היה הטקסט האחרון
-      recognizedSoFarRef.current =
-        lastCombinedRef.current || recognizedSoFarRef.current;
-
-      if (manualPauseRef.current) {
-        setRecordingState("paused");
-      } else {
-        setRecordingState("idle");
-      }
-    };
-
-    recognitionRef.current = recognition;
-
-    return () => {
-      try {
-        recognition.stop();
-      } catch (e) {
-        console.log(
-          "[useAudioRecorder] cleanup stop error (ignored):",
-          e
-        );
-      }
-      recognitionRef.current = null;
-    };
-    // 🔴 שימי לב: לא תלוי יותר ב-onTranscriptionChunk
-  }, [language]);
-
-  const startRecording = () => {
-    const recognition = recognitionRef.current;
-    if (!recognition) {
-      console.warn(
-        "[useAudioRecorder] startRecording: recognition not initialized"
+        "[useAudioRecorder] startRecording called while recorder exists"
       );
       return;
     }
 
-    // התחלה חדשה לגמרי
-    recognizedSoFarRef.current = "";
-    lastCombinedRef.current = "";
-    manualPauseRef.current = false;
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      console.warn(
+        "[useAudioRecorder] getUserMedia not available in this browser"
+      );
+      return;
+    }
 
     try {
-      recognition.lang =
-        LANGUAGE_TO_LOCALE[language] || language || "en-US";
-      console.log(
-        "[useAudioRecorder] startRecording: calling recognition.start()",
-        {
-          lang: recognition.lang,
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+
+      // ננסה סוג MIME נפוץ, ואם לא נתמך – ניתן לדפדפן לבחור
+      let recorder;
+      const preferredType = "audio/webm;codecs=opus";
+
+      if (
+        window.MediaRecorder &&
+        window.MediaRecorder.isTypeSupported &&
+        window.MediaRecorder.isTypeSupported(preferredType)
+      ) {
+        recorder = new MediaRecorder(stream, { mimeType: preferredType });
+      } else {
+        recorder = new MediaRecorder(stream);
+      }
+
+      chunksRef.current = [];
+
+      recorder.ondataavailable = (event) => {
+        if (event.data && event.data.size > 0) {
+          chunksRef.current.push(event.data);
         }
-      );
-      recognition.start();
-      setRecordingState("recording");
+      };
+
+      recorder.onerror = (event) => {
+        console.error("[useAudioRecorder] MediaRecorder error:", event.error || event);
+      };
+
+      recorder.onstop = async () => {
+        try {
+          const mimeType =
+            recorder.mimeType ||
+            preferredType ||
+            "audio/webm";
+
+          const blob = new Blob(chunksRef.current, { type: mimeType });
+          chunksRef.current = [];
+
+          // סגירת המיקרופון
+          if (streamRef.current) {
+            streamRef.current.getTracks().forEach((track) => track.stop());
+            streamRef.current = null;
+          }
+
+          if (!blob || blob.size === 0) {
+            console.warn("[useAudioRecorder] Recorded blob is empty");
+            mediaRecorderRef.current = null;
+            return;
+          }
+
+          const langCode = (language || "en").toLowerCase();
+          const sessionText = await uploadAndTranscribe(blob, langCode);
+
+          if (callbackRef.current && sessionText) {
+            // מחזירים את כל הטקסט של הסשן – הלוגיקה של הוספה בלי כפילות
+            // כבר קיימת ב-DreamInputCard (baseTextRef ועוד).
+            callbackRef.current(sessionText);
+          }
+        } catch (e) {
+          console.error(
+            "[useAudioRecorder] Failed to handle recording stop / transcription:",
+            e
+          );
+        } finally {
+          mediaRecorderRef.current = null;
+        }
+      };
+
+      mediaRecorderRef.current = recorder;
+      recorder.start();
+      console.log("[useAudioRecorder] Recording started");
     } catch (e) {
-      console.error(
-        "[useAudioRecorder] Failed to start recognition:",
-        e
-      );
+      console.error("[useAudioRecorder] Failed to start recording:", e);
     }
   };
 
   const pauseRecording = () => {
-    const recognition = recognitionRef.current;
-    if (!recognition) {
+    const recorder = mediaRecorderRef.current;
+    if (!recorder) {
+      console.warn("[useAudioRecorder] pauseRecording: no active recorder");
+      return;
+    }
+    if (recorder.state !== "recording") {
       console.warn(
-        "[useAudioRecorder] pauseRecording: recognition not initialized"
+        "[useAudioRecorder] pauseRecording: recorder is not in 'recording' state"
       );
       return;
     }
 
-    manualPauseRef.current = true;
-
     try {
-      console.log(
-        "[useAudioRecorder] pauseRecording: calling recognition.stop()"
-      );
-      recognition.stop();
-      // onend יעדכן ל-"paused"
+      recorder.pause();
+      console.log("[useAudioRecorder] Recording paused");
     } catch (e) {
-      console.error(
-        "[useAudioRecorder] Failed to pause recognition:",
-        e
-      );
+      console.error("[useAudioRecorder] Failed to pause recording:", e);
     }
   };
 
   const resumeRecording = () => {
-    const recognition = recognitionRef.current;
-    if (!recognition) {
+    const recorder = mediaRecorderRef.current;
+    if (!recorder) {
+      console.warn("[useAudioRecorder] resumeRecording: no active recorder");
+      return;
+    }
+    if (recorder.state !== "paused") {
       console.warn(
-        "[useAudioRecorder] resumeRecording: recognition not initialized"
+        "[useAudioRecorder] resumeRecording: recorder is not in 'paused' state"
       );
       return;
     }
 
-    manualPauseRef.current = false;
-
     try {
-      console.log(
-        "[useAudioRecorder] resumeRecording: calling recognition.start()"
-      );
-      recognition.start();
-      setRecordingState("recording");
+      recorder.resume();
+      console.log("[useAudioRecorder] Recording resumed");
     } catch (e) {
-      console.error(
-        "[useAudioRecorder] Failed to resume recognition:",
-        e
-      );
+      console.error("[useAudioRecorder] Failed to resume recording:", e);
     }
   };
 
   const stopRecording = () => {
-    const recognition = recognitionRef.current;
-    if (!recognition) {
+    const recorder = mediaRecorderRef.current;
+    if (!recorder) {
+      console.warn("[useAudioRecorder] stopRecording: no active recorder");
+      return;
+    }
+    if (recorder.state === "inactive") {
       console.warn(
-        "[useAudioRecorder] stopRecording: recognition not initialized"
+        "[useAudioRecorder] stopRecording: recorder already inactive"
       );
       return;
     }
 
-    // זה לא פאוז, זה סיום – חוזרים ל-idle
-    manualPauseRef.current = false;
-
     try {
-      console.log(
-        "[useAudioRecorder] stopRecording: calling recognition.stop()"
-      );
-      recognition.stop();
+      console.log("[useAudioRecorder] Stopping recording");
+      recorder.stop();
+      // onstop מטפל בשאר (סגירת stream, שליחה לשרת, callback)
     } catch (e) {
-      console.error(
-        "[useAudioRecorder] Failed to stop recognition:",
-        e
-      );
-    }
+      console.error("[useAudioRecorder] Failed to stop recording:", e);
+      mediaRecorderRef.current = null;
 
-    setRecordingState("idle");
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
+      }
+    }
   };
 
+  // הממשק החיצוני בדיוק כמו קודם – DreamInputCard משתמש רק בזה
   return {
-    recordingState,
     startRecording,
     pauseRecording,
     resumeRecording,

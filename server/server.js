@@ -4,11 +4,18 @@ import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import bodyParser from "body-parser";
-import Groq from "groq-sdk";
+import multer from "multer";
+import Groq, { toFile } from "groq-sdk";
 
 const app = express();
 app.use(cors());
 app.use(bodyParser.json());
+
+const upload = multer({ storage: multer.memoryStorage() });
+
+const client = new Groq({
+  apiKey: process.env.GROQ_API_KEY,
+});
 
 // מפת קודי שפה לשם שפה אנושי – תואם 1:1 ל־LanguageSwitcher
 const LANGUAGE_NAMES = {
@@ -35,10 +42,6 @@ const LANGUAGE_NAMES = {
   ja: "Japanese",
 };
 
-const client = new Groq({
-  apiKey: process.env.GROQ_API_KEY,
-});
-
 app.post("/api/interpret", async (req, res) => {
   try {
     console.log("Incoming body:", req.body);
@@ -55,7 +58,6 @@ app.post("/api/interpret", async (req, res) => {
       LANGUAGE_NAMES[langCode.slice(0, 2)] ||
       "English";
 
-  
     const systemPrompt = `
 You are a dream interpreter.
 Always respond in ${langName}.
@@ -245,6 +247,58 @@ No markdown, no commentary.
   } catch (err) {
     console.error("Translation API error:", err);
     return res.json({ translations: {} });
+  }
+});
+
+// ⭐ AUDIO TRANSCRIPTION ENDPOINT – יחיד
+app.post("/api/transcribe", upload.single("file"), async (req, res) => {
+  try {
+    const file = req.file;
+
+    if (!file) {
+      return res.status(400).json({ error: "No audio file uploaded" });
+    }
+
+    const { language } = req.body;
+    const langCode = (language || "en").toLowerCase();
+
+    const langName =
+      LANGUAGE_NAMES[langCode] ||
+      LANGUAGE_NAMES[langCode.slice(0, 2)] ||
+      "English";
+
+    console.log("[/api/transcribe] Incoming file:", {
+      originalname: file.originalname,
+      mimetype: file.mimetype,
+      size: file.size,
+      language: langCode,
+      langName,
+    });
+
+    const audioFile = await toFile(
+      file.buffer,
+      file.originalname || "audio.webm"
+    );
+
+    const transcription = await client.audio.transcriptions.create({
+      file: audioFile,
+      model: "whisper-large-v3-turbo",
+      response_format: "json",
+      language: langCode,
+      temperature: 0.0,
+    });
+
+    const text = transcription.text || "";
+
+    console.log("[/api/transcribe] Transcription length:", text.length);
+
+    return res.json({ text });
+  } catch (err) {
+    console.error("Transcription error:", err);
+    return res.status(500).json({
+      error: "Transcription service is temporarily unavailable.",
+      details: err?.message || "Unknown error",
+    });
   }
 });
 
