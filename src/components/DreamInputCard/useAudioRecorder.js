@@ -1,11 +1,9 @@
+// src/components/DreamInputCard/useAudioRecorder.js
 import { useRef, useEffect } from "react";
 import { useTranslation } from "../../TranslationContext";
 import { TRANSCRIBE_URL } from "../../config/api";
 
-
-
-
-// שליחת Blob של אודיו לשרת וקבלת טקסט בחזרה
+// שליחת Blob לשרת וקבלת טקסט מתומלל
 async function uploadAndTranscribe(blob, language) {
   const formData = new FormData();
   formData.append("file", blob, "recording.webm");
@@ -13,6 +11,8 @@ async function uploadAndTranscribe(blob, language) {
   if (language) {
     formData.append("language", language.toLowerCase());
   }
+
+  console.log("[useAudioRecorder] Uploading blob, size:", blob.size);
 
   const response = await fetch(TRANSCRIBE_URL, {
     method: "POST",
@@ -22,22 +22,21 @@ async function uploadAndTranscribe(blob, language) {
   if (!response.ok) {
     console.error(
       "[useAudioRecorder] Transcribe request failed:",
-      response.status
+      response.status,
+      response.statusText
     );
     return "";
   }
 
   try {
     const data = await response.json();
+    console.log("[useAudioRecorder] Transcription response:", data);
     return data.text || "";
   } catch (e) {
     console.error("[useAudioRecorder] Failed to parse transcription JSON:", e);
     return "";
   }
 }
-
-
-
 
 export default function useAudioRecorder(options = {}) {
   const { onTranscriptionChunk } = options;
@@ -47,14 +46,12 @@ export default function useAudioRecorder(options = {}) {
   const streamRef = useRef(null);
   const chunksRef = useRef([]);
 
-  // שומרים את callback ברפרנס כדי לא להיתקע על סגירה ישנה
   const callbackRef = useRef(onTranscriptionChunk);
   useEffect(() => {
     callbackRef.current = onTranscriptionChunk;
   }, [onTranscriptionChunk]);
 
   const startRecording = async () => {
-    // אם כבר יש הקלטה פעילה – לא מתחילים שוב
     if (mediaRecorderRef.current) {
       console.warn(
         "[useAudioRecorder] startRecording called while recorder exists"
@@ -73,7 +70,6 @@ export default function useAudioRecorder(options = {}) {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
 
-      // ננסה סוג MIME נפוץ, ואם לא נתמך – ניתן לדפדפן לבחור
       let recorder;
       const preferredType = "audio/webm;codecs=opus";
 
@@ -96,20 +92,22 @@ export default function useAudioRecorder(options = {}) {
       };
 
       recorder.onerror = (event) => {
-        console.error("[useAudioRecorder] MediaRecorder error:", event.error || event);
+        console.error(
+          "[useAudioRecorder] MediaRecorder error:",
+          event.error || event
+        );
       };
 
       recorder.onstop = async () => {
         try {
+          console.log("[useAudioRecorder] Recording stopped, building blob");
+
           const mimeType =
-            recorder.mimeType ||
-            preferredType ||
-            "audio/webm";
+            recorder.mimeType || preferredType || "audio/webm";
 
           const blob = new Blob(chunksRef.current, { type: mimeType });
           chunksRef.current = [];
 
-          // סגירת המיקרופון
           if (streamRef.current) {
             streamRef.current.getTracks().forEach((track) => track.stop());
             streamRef.current = null;
@@ -125,8 +123,6 @@ export default function useAudioRecorder(options = {}) {
           const sessionText = await uploadAndTranscribe(blob, langCode);
 
           if (callbackRef.current && sessionText) {
-            // מחזירים את כל הטקסט של הסשן – הלוגיקה של הוספה בלי כפילות
-            // כבר קיימת ב-DreamInputCard (baseTextRef ועוד).
             callbackRef.current(sessionText);
           }
         } catch (e) {
@@ -155,7 +151,8 @@ export default function useAudioRecorder(options = {}) {
     }
     if (recorder.state !== "recording") {
       console.warn(
-        "[useAudioRecorder] pauseRecording: recorder is not in 'recording' state"
+        "[useAudioRecorder] pauseRecording: recorder is not in 'recording' state, state=",
+        recorder.state
       );
       return;
     }
@@ -176,7 +173,8 @@ export default function useAudioRecorder(options = {}) {
     }
     if (recorder.state !== "paused") {
       console.warn(
-        "[useAudioRecorder] resumeRecording: recorder is not in 'paused' state"
+        "[useAudioRecorder] resumeRecording: recorder is not in 'paused' state, state=",
+        recorder.state
       );
       return;
     }
@@ -205,7 +203,7 @@ export default function useAudioRecorder(options = {}) {
     try {
       console.log("[useAudioRecorder] Stopping recording");
       recorder.stop();
-      // onstop מטפל בשאר (סגירת stream, שליחה לשרת, callback)
+      // onstop יטפל בשאר
     } catch (e) {
       console.error("[useAudioRecorder] Failed to stop recording:", e);
       mediaRecorderRef.current = null;
@@ -217,7 +215,6 @@ export default function useAudioRecorder(options = {}) {
     }
   };
 
-  // הממשק החיצוני בדיוק כמו קודם – DreamInputCard משתמש רק בזה
   return {
     startRecording,
     pauseRecording,
