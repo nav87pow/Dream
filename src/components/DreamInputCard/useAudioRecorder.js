@@ -185,6 +185,11 @@ export default function useAudioRecorder(options = {}) {
       console.warn(
         "[useAudioRecorder] getUserMedia not available in this browser"
       );
+      // חשוב במיוחד למובייל – שהמשתמש יבין למה זה לא עובד
+      alert(
+        "הדפדפן לא תומך בהקלטת קול או שהגישה למיקרופון חסומה.\n" +
+        "יש לבדוק את הגדרות המיקרופון לדפדפן/לאתר."
+      );
       return;
     }
 
@@ -199,6 +204,11 @@ export default function useAudioRecorder(options = {}) {
       createAndStartRecorder(stream);
     } catch (e) {
       console.error("[useAudioRecorder] Failed to start recording:", e);
+      // הודעה ברורה גם במובייל (ללא DevTools)
+      alert(
+        "לא הצלחתי להפעיל את המיקרופון.\n" +
+        "בדוק/י שהרשאת מיקרופון מופעלת לאתר הזה בהגדרות הדפדפן ונסה/י שוב."
+      );
     }
   };
 
