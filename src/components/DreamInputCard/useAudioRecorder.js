@@ -2,30 +2,7 @@ import { useRef, useEffect } from "react";
 import { useTranslation } from "../../TranslationContext";
 import { TRANSCRIBE_URL } from "../../config/api";
 
-// מיפוי קוד שפה -> לוקאל של הדפדפן
-//const LANGUAGE_TO_LOCALE = {
-  en: "en-US",
-  he: "he-IL",
-  hu: "hu-HU",
-  pt: "pt-PT",
-  es: "es-ES",
-  ro: "ro-RO",
-  de: "de-DE",
-  it: "it-IT",
-  fr: "fr-FR",
-  et: "et-EE",
-  ru: "ru-RU",
-  uk: "uk-UA",
-  ar: "ar-SA",
-  pl: "pl-PL",
-  is: "is-IS",
-  el: "el-GR",
-  cs: "cs-CZ",
-  no: "nb-NO",
-  fi: "fi-FI",
-  sv: "sv-SE",
-  ja: "ja-JP",
-//};
+
 
 
 // שליחת Blob של אודיו לשרת וקבלת טקסט בחזרה
