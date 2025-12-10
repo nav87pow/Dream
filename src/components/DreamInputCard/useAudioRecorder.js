@@ -1,9 +1,9 @@
-import { useState, useRef, useEffect } from "react";
+import { useRef, useEffect } from "react";
 import { useTranslation } from "../../TranslationContext";
 import { TRANSCRIBE_URL } from "../../config/api";
 
 // מיפוי קוד שפה -> לוקאל של הדפדפן
-const LANGUAGE_TO_LOCALE = {
+//const LANGUAGE_TO_LOCALE = {
   en: "en-US",
   he: "he-IL",
   hu: "hu-HU",
@@ -25,7 +25,7 @@ const LANGUAGE_TO_LOCALE = {
   fi: "fi-FI",
   sv: "sv-SE",
   ja: "ja-JP",
-};
+//};
 
 
 // שליחת Blob של אודיו לשרת וקבלת טקסט בחזרה
