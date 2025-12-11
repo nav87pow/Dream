@@ -118,8 +118,7 @@ export default function useAudioRecorder(options = {}) {
         }
 
         const blob = new Blob(chunksRef.current, { type: "audio/webm" });
-        const currentChunks = [...chunksRef.current];
-        chunksRef.current = [];
+        chunksRef.current = []; // משאירים את האיפוס, כי צריך אותו
 
         // שולחים את ה-blob המלא לתמלול
         await transcribeBlob(blob);
