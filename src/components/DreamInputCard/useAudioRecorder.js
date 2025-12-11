@@ -11,7 +11,7 @@ const API_BASE_URL =
 /**
  * useAudioRecorder
  *
- * מקליט אודיו מהמיקרופון, ושולח כל שניה chunk לשרת התמלול.
+ * מקליט אודיו מהמיקרופון, ושולח כל 5 שניות chunk לשרת התמלול.
  * כל תשובה מהשרת מצטברת ל-sessionTextRef ונשלחת למעלה דרך onTranscriptionChunk.
  *
  * ה-API:
@@ -28,12 +28,22 @@ export default function useAudioRecorder(options = {}) {
   // טקסט מצטבר של ההקלטה הנוכחית
   const sessionTextRef = useRef("");
 
+  // דגל למניעת בקשות חופפות לשרת
+  const isTranscribingRef = useRef(false);
+
   const [isRecording, setIsRecording] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
 
   // --- שליחת chunk יחיד לשרת ---
   const transcribeChunk = useCallback(
     async (blob) => {
+      if (isTranscribingRef.current) {
+        // כבר יש בקשה רצה – כדי לא להפציץ את השרת, נדלג על ה-chunk הזה
+        return;
+      }
+
+      isTranscribingRef.current = true;
+
       try {
         const formData = new FormData();
         formData.append("file", blob, "chunk.webm");
@@ -80,6 +90,8 @@ export default function useAudioRecorder(options = {}) {
         }
       } catch (err) {
         console.error("[useAudioRecorder] transcribeChunk error:", err);
+      } finally {
+        isTranscribingRef.current = false;
       }
     },
     [language, onTranscriptionChunk]
@@ -101,9 +113,8 @@ export default function useAudioRecorder(options = {}) {
       sessionTextRef.current = "";
 
       recorder.ondataavailable = async (event) => {
-        // הפונקציה הזאת נקראת כל פעם שנוצר chunk (כל שניה)
+        // נקרא כל 5 שניות
         if (!event.data || event.data.size === 0) return;
-
         await transcribeChunk(event.data);
       };
 
@@ -112,7 +123,7 @@ export default function useAudioRecorder(options = {}) {
       };
 
       mediaRecorderRef.current = recorder;
-      recorder.start(1000); // 👈 כל 1000ms נקבל ondataavailable
+      recorder.start(5000); // 👈 כל 5000ms נקבל ondataavailable
 
       setIsRecording(true);
       setIsPaused(false);
@@ -175,12 +186,13 @@ export default function useAudioRecorder(options = {}) {
       mediaRecorderRef.current = null;
       setIsRecording(false);
       setIsPaused(false);
+      isTranscribingRef.current = false;
 
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((track) => track.stop());
         streamRef.current = null;
       }
-      // לא מאפסים כאן sessionTextRef.current – כי הטקסט כבר הועבר ל-DreamInputCard
+      // לא מאפסים כאן sessionTextRef.current – הטקסט כבר נשלח למעלה
     }
   }, []);
 
