@@ -11,9 +11,8 @@ const API_BASE_URL =
 /**
  * useAudioRecorder
  *
- * מקליט אודיו מהמיקרופון, שומר את ההקלטה כ-buffer,
- * ושולח את כל ההקלטה בפעם אחת לשרת התמלול
- * כשנלחץ Pause או Stop.
+ * מקליט אודיו מהמיקרופון, ושולח כל שניה chunk לשרת התמלול.
+ * כל תשובה מהשרת מצטברת ל-sessionTextRef ונשלחת למעלה דרך onTranscriptionChunk.
  *
  * ה-API:
  * useAudioRecorder({ onTranscriptionChunk, language })
@@ -25,20 +24,19 @@ export default function useAudioRecorder(options = {}) {
 
   const mediaRecorderRef = useRef(null);
   const streamRef = useRef(null);
-  const chunksRef = useRef([]); // אוסף את כל ה-chunks של הסשן
 
-  // טקסט מצטבר של ההקלטה הנוכחית (מאפס עם start חדש, אבל נשמר מחוץ ל-hook ב-baseTextRef)
+  // טקסט מצטבר של ההקלטה הנוכחית
   const sessionTextRef = useRef("");
 
   const [isRecording, setIsRecording] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
 
-  // --- פונקציה פנימית: שליחה לשרת של Blob אחד מלא ---
-  const transcribeBlob = useCallback(
+  // --- שליחת chunk יחיד לשרת ---
+  const transcribeChunk = useCallback(
     async (blob) => {
       try {
         const formData = new FormData();
-        formData.append("file", blob, "audio.webm");
+        formData.append("file", blob, "chunk.webm");
 
         if (language) {
           formData.append("language", language);
@@ -64,7 +62,7 @@ export default function useAudioRecorder(options = {}) {
           return;
         }
 
-        // עדכון המצטבר של הסשן
+        // צבירת טקסט הסשן
         if (!sessionTextRef.current) {
           sessionTextRef.current = text.trim();
         } else {
@@ -81,7 +79,7 @@ export default function useAudioRecorder(options = {}) {
           onTranscriptionChunk(sessionTextRef.current);
         }
       } catch (err) {
-        console.error("[useAudioRecorder] transcribeBlob error:", err);
+        console.error("[useAudioRecorder] transcribeChunk error:", err);
       }
     },
     [language, onTranscriptionChunk]
@@ -99,72 +97,77 @@ export default function useAudioRecorder(options = {}) {
         mimeType: "audio/webm",
       });
 
-      chunksRef.current = []; // איפוס
+      // איפוס טקסט הסשן בתחילת הקלטה חדשה
+      sessionTextRef.current = "";
 
-      recorder.ondataavailable = (event) => {
-        if (event.data && event.data.size > 0) {
-          chunksRef.current.push(event.data);
-        }
+      recorder.ondataavailable = async (event) => {
+        // הפונקציה הזאת נקראת כל פעם שנוצר chunk (כל שניה)
+        if (!event.data || event.data.size === 0) return;
+
+        await transcribeChunk(event.data);
       };
 
       recorder.onerror = (err) => {
         console.error("[useAudioRecorder] MediaRecorder error:", err);
       };
 
-      recorder.onstop = async () => {
-        // כשעוצרים – מחברים את כל ה-chunks ושולחים לשרת
-        if (!chunksRef.current.length) {
-          return;
-        }
-
-        const blob = new Blob(chunksRef.current, { type: "audio/webm" });
-        chunksRef.current = []; // משאירים את האיפוס, כי צריך אותו
-
-        // שולחים את ה-blob המלא לתמלול
-        await transcribeBlob(blob);
-      };
-
       mediaRecorderRef.current = recorder;
-      recorder.start(); // בלי timeslice – chunk אחד גדול עד עצירה
+      recorder.start(1000); // 👈 כל 1000ms נקבל ondataavailable
 
       setIsRecording(true);
       setIsPaused(false);
     } catch (err) {
       console.error("[useAudioRecorder] getUserMedia error:", err);
     }
-  }, [isRecording, transcribeBlob]);
+  }, [isRecording, transcribeChunk]);
 
-  // --- Pause: עצירה + תמלול ההקלטה עד עכשיו ---
+  // --- Pause ---
   const pauseRecording = useCallback(() => {
     const recorder = mediaRecorderRef.current;
     if (!recorder || !isRecording || isPaused) return;
 
     try {
-      if (recorder.state !== "inactive") {
-        recorder.stop(); // יפעיל onstop → transcribeBlob
+      if (typeof recorder.pause === "function") {
+        recorder.pause();
+      } else {
+        // fallback: אם אין pause, נעצור
+        recorder.stop();
       }
-      setIsRecording(false);
       setIsPaused(true);
     } catch (err) {
       console.error("[useAudioRecorder] pause error:", err);
     }
   }, [isRecording, isPaused]);
 
-  // --- Resume: מתחיל סשן חדש, על גבי הטקסט שכבר תומלל ---
+  // --- Resume ---
   const resumeRecording = useCallback(async () => {
-    if (isRecording) return;
+    const recorder = mediaRecorderRef.current;
 
-    setIsPaused(false);
-    await startRecording();
+    if (recorder && recorder.state === "paused") {
+      try {
+        recorder.resume();
+        setIsPaused(false);
+        return;
+      } catch (err) {
+        console.error("[useAudioRecorder] resume error:", err);
+      }
+    }
+
+    // fallback: אם אין recorder פעיל – מתחילים הקלטה חדשה
+    if (!isRecording) {
+      await startRecording();
+    } else {
+      setIsPaused(false);
+    }
   }, [isRecording, startRecording]);
 
-  // --- Stop: עצירה מלאה + סגירת מיקרופון ---
+  // --- Stop לגמרי ---
   const stopRecording = useCallback(() => {
     const recorder = mediaRecorderRef.current;
 
     try {
       if (recorder && recorder.state !== "inactive") {
-        recorder.stop(); // onstop ידאג לתמלול
+        recorder.stop();
       }
     } catch (err) {
       console.error("[useAudioRecorder] stop error:", err);
@@ -177,9 +180,7 @@ export default function useAudioRecorder(options = {}) {
         streamRef.current.getTracks().forEach((track) => track.stop());
         streamRef.current = null;
       }
-
-      // אם תרצה לאפס את הטקסט של הסשן בסוף לחלוטין:
-      // sessionTextRef.current = "";
+      // לא מאפסים כאן sessionTextRef.current – כי הטקסט כבר הועבר ל-DreamInputCard
     }
   }, []);
 
