@@ -1,312 +1,189 @@
 // src/components/DreamInputCard/useAudioRecorder.js
-import { useRef, useEffect } from "react";
-import { useTranslation } from "../../TranslationContext";
-import { TRANSCRIBE_URL } from "../../config/api";
+import { useCallback, useRef, useState } from "react";
 
-// שליחת Blob לשרת וקבלת טקסט מתומלל
-async function uploadAndTranscribe(blob, language) {
-  const formData = new FormData();
-  formData.append("file", blob, "recording.webm");
-
-  if (language) {
-    formData.append("language", language.toLowerCase());
-  }
-
-  console.log("[useAudioRecorder] Uploading blob, size:", blob.size);
-
-  const response = await fetch(TRANSCRIBE_URL, {
-    method: "POST",
-    body: formData,
-  });
-
-  if (!response.ok) {
-    console.error(
-      "[useAudioRecorder] Transcribe request failed:",
-      response.status,
-      response.statusText
-    );
-    return "";
-  }
-
-  try {
-    const data = await response.json();
-    console.log("[useAudioRecorder] Transcription response:", data);
-    // השרת מחזיר text – אם אצלך השדה שונה, תעדכן כאן
-    return data.text || "";
-  } catch (e) {
-    console.error("[useAudioRecorder] Failed to parse transcription JSON:", e);
-    return "";
-  }
-}
+/**
+ * useAudioRecorder
+ *
+ * אחראי להקלטת אודיו מהמיקרופון, שליחת chunk כל שניה לשרת התמלול,
+ * והחזרת טקסט מצטבר של ההקלטה הנוכחית דרך onTranscriptionChunk.
+ *
+ * ה־API נשאר כמו שהיה בדREAMInputCard:
+ * useAudioRecorder({ onTranscriptionChunk })
+ * מחזיר: { startRecording, pauseRecording, resumeRecording, stopRecording }
+ */
 
 export default function useAudioRecorder(options = {}) {
-  const { onTranscriptionChunk } = options;
-  const { language } = useTranslation();
+  const { onTranscriptionChunk, language } = options;
 
   const mediaRecorderRef = useRef(null);
   const streamRef = useRef(null);
-  const chunksRef = useRef([]);
-  const aggregateTranscriptRef = useRef(""); // צבירת כל הטקסט עד עכשיו
-  const stopReasonRef = useRef(null); // "pause" או "final"
 
-  const callbackRef = useRef(onTranscriptionChunk);
+  // טקסט מצטבר של ההקלטה הנוכחית (מאפס עם start חדש)
+  const sessionTextRef = useRef("");
 
-  useEffect(() => {
-    callbackRef.current = onTranscriptionChunk;
-  }, [onTranscriptionChunk]);
+  const [isRecording, setIsRecording] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
 
-  const cleanupStream = () => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((track) => track.stop());
-      streamRef.current = null;
-    }
-  };
-
-  const createAndStartRecorder = (stream) => {
-    if (!stream) {
-      console.warn("[useAudioRecorder] createAndStartRecorder: no stream");
-      return;
-    }
-
-    let recorder;
-    const preferredType = "audio/webm;codecs=opus";
-
-    try {
-      if (
-        window.MediaRecorder &&
-        window.MediaRecorder.isTypeSupported &&
-        window.MediaRecorder.isTypeSupported(preferredType)
-      ) {
-        recorder = new MediaRecorder(stream, { mimeType: preferredType });
-      } else {
-        recorder = new MediaRecorder(stream);
-      }
-    } catch (e) {
-      console.error("[useAudioRecorder] Failed to create MediaRecorder:", e);
-      return;
-    }
-
-    chunksRef.current = [];
-
-    recorder.ondataavailable = (event) => {
-      if (event.data && event.data.size > 0) {
-        chunksRef.current.push(event.data);
-      }
-    };
-
-    recorder.onerror = (event) => {
-      console.error(
-        "[useAudioRecorder] MediaRecorder error:",
-        event.error || event
-      );
-    };
-
-    recorder.onstop = async () => {
-      const reason = stopReasonRef.current || "final";
-
+  // --- פונקציה פנימית: שליחה לשרת של chunk יחיד ---
+  const transcribeChunk = useCallback(
+    async (blob) => {
       try {
-        console.log("[useAudioRecorder] Recording stopped, building blob");
+        const formData = new FormData();
+        formData.append("file", blob, "chunk.webm");
 
-        const mimeType = recorder.mimeType || preferredType || "audio/webm";
-        const blob = new Blob(chunksRef.current, { type: mimeType });
-        chunksRef.current = [];
-
-        // אם זה סטופ סופי – סוגרים סטרים; אם פאוז – משאירים כדי שנוכל להמשיך
-        if (reason === "final") {
-          cleanupStream();
+        // אם יש שפת הקשר – מוסיפים, אחרת השרת יתפוס ברירת מחדל (English)
+        if (language) {
+          formData.append("language", language);
         }
 
-        if (!blob || blob.size === 0) {
-          console.warn("[useAudioRecorder] Recorded blob is empty");
-          mediaRecorderRef.current = null;
-          stopReasonRef.current = null;
+        const res = await fetch("/api/transcribe", {
+          method: "POST",
+          body: formData,
+        });
+
+        if (!res.ok) {
+          console.error("[useAudioRecorder] /api/transcribe failed:", res.status);
           return;
         }
 
-        const langCode = (language || "en").toLowerCase();
-        const sessionText = await uploadAndTranscribe(blob, langCode);
+        const data = await res.json();
+        const chunkText = (data && data.text) || "";
 
-        if (!sessionText) {
-          mediaRecorderRef.current = null;
-          stopReasonRef.current = null;
+        if (!chunkText.trim()) {
           return;
         }
 
-        if (!callbackRef.current) {
-          mediaRecorderRef.current = null;
-          stopReasonRef.current = null;
-          return;
-        }
-
-        if (reason === "pause") {
-          // פאוז – מוסיפים לטקסט המצטבר ושולחים ל־textarea
-          const prev = aggregateTranscriptRef.current || "";
-          const combined = (prev + " " + sessionText).trim();
-          aggregateTranscriptRef.current = combined;
-          callbackRef.current(combined);
+        // עדכון המצטבר של הסשן
+        if (!sessionTextRef.current) {
+          sessionTextRef.current = chunkText.trim();
         } else {
-          // סטופ סופי – מחברים את כל מה שנאסף ומחזירים טקסט אחד
-          const prev = aggregateTranscriptRef.current || "";
-          const combined = (prev + " " + sessionText).trim() || sessionText;
-          aggregateTranscriptRef.current = "";
-          callbackRef.current(combined);
+          // מוסיפים רווח אם צריך
+          const needsSpace =
+            !sessionTextRef.current.endsWith(" ") && !chunkText.startsWith(" ");
+
+          sessionTextRef.current =
+            sessionTextRef.current + (needsSpace ? " " : "") + chunkText.trim();
         }
-      } catch (e) {
-        console.error(
-          "[useAudioRecorder] Failed to handle recording stop / transcription:",
-          e
-        );
-      } finally {
-        mediaRecorderRef.current = null;
-        stopReasonRef.current = null;
+
+        // החזרה למעלה – DREAMInputCard כבר יודע לחבר על בסיס baseTextRef
+        if (typeof onTranscriptionChunk === "function") {
+          onTranscriptionChunk(sessionTextRef.current);
+        }
+      } catch (err) {
+        console.error("[useAudioRecorder] transcribeChunk error:", err);
       }
-    };
+    },
+    [language, onTranscriptionChunk]
+  );
 
-    mediaRecorderRef.current = recorder;
-
-    try {
-      recorder.start();
-      console.log("[useAudioRecorder] Recording started");
-    } catch (e) {
-      console.error("[useAudioRecorder] Failed to start recorder:", e);
-      mediaRecorderRef.current = null;
-    }
-  };
-
-  const startRecording = async () => {
-    if (mediaRecorderRef.current) {
-      console.warn(
-        "[useAudioRecorder] startRecording called while recorder exists"
-      );
-      return;
-    }
-
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      console.warn(
-        "[useAudioRecorder] getUserMedia not available in this browser"
-      );
-      // חשוב במיוחד למובייל – שהמשתמש יבין למה זה לא עובד
-      alert(
-        "הדפדפן לא תומך בהקלטת קול או שהגישה למיקרופון חסומה.\n" +
-        "יש לבדוק את הגדרות המיקרופון לדפדפן/לאתר."
-      );
-      return;
-    }
+  // --- התחלת הקלטה ---
+  const startRecording = useCallback(async () => {
+    if (isRecording) return;
 
     try {
-      // מתחילים סשן חדש – מנקים טקסט מצטבר
-      aggregateTranscriptRef.current = "";
-      stopReasonRef.current = null;
-
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
 
-      createAndStartRecorder(stream);
-    } catch (e) {
-      console.error("[useAudioRecorder] Failed to start recording:", e);
-      // הודעה ברורה גם במובייל (ללא DevTools)
-      alert(
-        "לא הצלחתי להפעיל את המיקרופון.\n" +
-        "בדוק/י שהרשאת מיקרופון מופעלת לאתר הזה בהגדרות הדפדפן ונסה/י שוב."
-      );
-    }
-  };
+      // MediaRecorder עם חלוקה ל-chunk אחד כל 1000ms
+      const recorder = new MediaRecorder(stream, {
+        mimeType: "audio/webm",
+      });
 
-  const pauseRecording = () => {
+      // איפוס טקסט הסשן בתחילת הקלטה
+      sessionTextRef.current = "";
+
+      recorder.ondataavailable = async (event) => {
+        // הפונקציה הזאת נקראת כל פעם שנוצר chunk (כל שניה)
+        if (!event.data || event.data.size === 0) return;
+
+        // שולחים את ה-chunk לשרת
+        await transcribeChunk(event.data);
+      };
+
+      recorder.onerror = (err) => {
+        console.error("[useAudioRecorder] MediaRecorder error:", err);
+      };
+
+      mediaRecorderRef.current = recorder;
+      recorder.start(1000); // 👈 כל 1000ms נקבל ondataavailable
+      setIsRecording(true);
+      setIsPaused(false);
+    } catch (err) {
+      console.error("[useAudioRecorder] getUserMedia error:", err);
+    }
+  }, [isRecording, transcribeChunk]);
+
+  // --- Pause ---
+  const pauseRecording = useCallback(() => {
     const recorder = mediaRecorderRef.current;
-    if (!recorder) {
-      console.warn("[useAudioRecorder] pauseRecording: no active recorder");
-      return;
-    }
-
-    if (recorder.state !== "recording") {
-      console.warn(
-        "[useAudioRecorder] pauseRecording: recorder is not in 'recording' state, state=",
-        recorder.state
-      );
-      return;
-    }
+    if (!recorder || !isRecording || isPaused) return;
 
     try {
-      console.log(
-        "[useAudioRecorder] pauseRecording: stopping current segment for transcription"
-      );
-      // במקום pause אמיתי – אנחנו עושים stop חלקי, כדי לקבל Blob ולשלוח לתמלול
-      stopReasonRef.current = "pause";
-      recorder.stop(); // onstop ידאג לתמלול ולעדכון ה־textarea
-    } catch (e) {
-      console.error("[useAudioRecorder] Failed to pause (stop) recording:", e);
+      if (typeof recorder.pause === "function") {
+        recorder.pause();
+      } else {
+        // אם הדפדפן לא תומך – נ fallback ל-stop חלקי (ניתן לשפר בהמשך)
+        recorder.stop();
+      }
+      setIsPaused(true);
+    } catch (err) {
+      console.error("[useAudioRecorder] pause error:", err);
     }
-  };
+  }, [isRecording, isPaused]);
 
-  const resumeRecording = () => {
-    // אם יש עדיין recorder במצב paused – ננסה לחזור ממנו
-    const current = mediaRecorderRef.current;
-    if (current && current.state === "paused") {
+  // --- Resume ---
+  const resumeRecording = useCallback(async () => {
+    const recorder = mediaRecorderRef.current;
+
+    // אם יש pause מובנה – משתמשים בו
+    if (recorder && typeof recorder.resume === "function") {
       try {
-        current.resume();
-        console.log("[useAudioRecorder] Recording resumed (native pause/resume)");
+        recorder.resume();
+        setIsPaused(false);
         return;
-      } catch (e) {
-        console.warn(
-          "[useAudioRecorder] Failed native resume, will start new segment:",
-          e
-        );
+      } catch (err) {
+        console.error("[useAudioRecorder] resume error:", err);
       }
     }
 
-    if (!streamRef.current) {
-      console.warn(
-        "[useAudioRecorder] resumeRecording: no active stream, starting new recording"
-      );
-      // אין סטרים – נתחיל מהתחלה
-      startRecording();
-      return;
+    // fallback: אם אין recorder פעיל – נתחיל הקלטה חדשה מאותו stream
+    if (!isRecording) {
+      await startRecording();
+    } else {
+      setIsPaused(false);
     }
+  }, [isRecording, startRecording]);
 
-    try {
-      console.log("[useAudioRecorder] resumeRecording: starting new segment");
-      stopReasonRef.current = null;
-      createAndStartRecorder(streamRef.current);
-    } catch (e) {
-      console.error("[useAudioRecorder] Failed to resume recording:", e);
-    }
-  };
-
-  const stopRecording = () => {
+  // --- Stop לגמרי ---
+  const stopRecording = useCallback(() => {
     const recorder = mediaRecorderRef.current;
-    if (!recorder) {
-      console.warn("[useAudioRecorder] stopRecording: no active recorder");
-      // בכל מקרה נוודא שסטרים סגור
-      cleanupStream();
-      return;
-    }
-
-    if (recorder.state === "inactive") {
-      console.warn(
-        "[useAudioRecorder] stopRecording: recorder already inactive"
-      );
-      cleanupStream();
-      return;
-    }
+    if (!recorder) return;
 
     try {
-      console.log("[useAudioRecorder] Stopping recording (final)");
-      stopReasonRef.current = "final";
-      recorder.stop();
-      // onstop יטפל בכל השאר (תמלול, ניקוי, סגירת סטרים)
-    } catch (e) {
-      console.error("[useAudioRecorder] Failed to stop recording:", e);
+      if (recorder.state !== "inactive") {
+        recorder.stop();
+      }
+    } catch (err) {
+      console.error("[useAudioRecorder] stop error:", err);
+    } finally {
       mediaRecorderRef.current = null;
-      stopReasonRef.current = null;
-      cleanupStream();
+      setIsRecording(false);
+      setIsPaused(false);
+
+      // עצירת המיקרופון
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
+      }
     }
-  };
+  }, []);
 
   return {
     startRecording,
     pauseRecording,
     resumeRecording,
     stopRecording,
+    isRecording,
+    isPaused,
   };
 }
