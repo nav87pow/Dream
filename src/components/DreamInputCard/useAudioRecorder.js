@@ -8,11 +8,20 @@ const API_BASE_URL =
     ? "http://localhost:4000"
     : "https://dream-eyyq.onrender.com");
 
+// תבנית זמני הטריגר במילישניות: 5, 10, 20, 30, 40, 50 שניות
+const TRIGGER_PATTERN = [5000, 10000, 20000, 30000, 40000, 50000];
+// אחרי שהגענו לפעם הראשונה של 50 שניות – נוסיף עוד 50 שניות כל פעם
+
 /**
  * useAudioRecorder
  *
- * מקליט אודיו מהמיקרופון, ושולח כל 5 שניות chunk לשרת התמלול.
- * כל תשובה מהשרת מצטברת ל-sessionTextRef ונשלחת למעלה דרך onTranscriptionChunk.
+ * - מקליט אודיו מהמיקרופון ע״י MediaRecorder עם timeslice = 1000ms (שניה).
+ * - שומר את *כל* ה-chunks ב־chunksRef.
+ * - בזמן ההקלטה יש טיימר פנימי שבודק כל חצי שניה:
+ *   - אם עברו 5/10/20/... שניות מאז תחילת ההקלטה
+ *   - נבנה Blob מכל מה שהוקלט עד עכשיו ושולחים אותו לתמלול (transcribeBlob)
+ *   - הטקסט המצטבר נשמר ב-sessionTextRef
+ *   - נשלח למעלה דרך onTranscriptionChunk – DreamInputCard כבר יודע לחבר את זה לטקסט המשתמש
  *
  * ה-API:
  * useAudioRecorder({ onTranscriptionChunk, language })
@@ -24,21 +33,23 @@ export default function useAudioRecorder(options = {}) {
 
   const mediaRecorderRef = useRef(null);
   const streamRef = useRef(null);
+  const chunksRef = useRef([]); // כל ה-chunks מהתחלת ההקלטה
+  const sessionTextRef = useRef(""); // טקסט מצטבר מכל הבקשות
 
-  // טקסט מצטבר של ההקלטה הנוכחית
-  const sessionTextRef = useRef("");
-
-  // דגל למניעת בקשות חופפות לשרת
-  const isTranscribingRef = useRef(false);
+  const isTranscribingRef = useRef(false); // כדי למנוע בקשות חופפות
+  const timerIdRef = useRef(null);
+  const startTimeRef = useRef(null);
+  const nextTriggerTimeRef = useRef(null); // ms מאז תחילת ההקלטה
+  const triggerIndexRef = useRef(0); // אינדקס בתוך TRIGGER_PATTERN
 
   const [isRecording, setIsRecording] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
 
-  // --- שליחת chunk יחיד לשרת ---
-  const transcribeChunk = useCallback(
+  // --- שליחת Blob לשרת (ההקלטה המלאה עד עכשיו) ---
+  const transcribeBlob = useCallback(
     async (blob) => {
       if (isTranscribingRef.current) {
-        // כבר יש בקשה רצה – כדי לא להפציץ את השרת, נדלג על ה-chunk הזה
+        // יש כבר בקשה רצה – לא נשלח עוד אחת במקביל
         return;
       }
 
@@ -46,7 +57,7 @@ export default function useAudioRecorder(options = {}) {
 
       try {
         const formData = new FormData();
-        formData.append("file", blob, "chunk.webm");
+        formData.append("file", blob, "audio.webm");
 
         if (language) {
           formData.append("language", language);
@@ -89,13 +100,70 @@ export default function useAudioRecorder(options = {}) {
           onTranscriptionChunk(sessionTextRef.current);
         }
       } catch (err) {
-        console.error("[useAudioRecorder] transcribeChunk error:", err);
+        console.error("[useAudioRecorder] transcribeBlob error:", err);
       } finally {
         isTranscribingRef.current = false;
       }
     },
     [language, onTranscriptionChunk]
   );
+
+  // --- התחלת טיימר טריגרים (5,10,20,30,40,50 ואז כל 50 שניות) ---
+  const startTriggerTimer = useCallback(() => {
+    // איפוס נתוני זמן
+    startTimeRef.current = Date.now();
+    triggerIndexRef.current = 0;
+    nextTriggerTimeRef.current = TRIGGER_PATTERN[0]; // 5 שניות
+
+    // אם היה טיימר קודם – ננקה
+    if (timerIdRef.current) {
+      clearInterval(timerIdRef.current);
+      timerIdRef.current = null;
+    }
+
+    // טיימר כל 500ms – לבדוק אם עברנו את הטריגר הבא
+    timerIdRef.current = window.setInterval(() => {
+      const recorder = mediaRecorderRef.current;
+      if (!recorder || !isRecording) {
+        return;
+      }
+
+      if (!startTimeRef.current || nextTriggerTimeRef.current == null) {
+        return;
+      }
+
+      const elapsed = Date.now() - startTimeRef.current; // ms מאז תחילת ההקלטה
+
+      // אם עברנו את זמן הטריגר – שולחים את כל ההקלטה עד עכשיו
+      if (
+        elapsed >= nextTriggerTimeRef.current &&
+        chunksRef.current.length > 0 &&
+        !isTranscribingRef.current
+      ) {
+        const blob = new Blob(chunksRef.current, { type: "audio/webm" });
+        transcribeBlob(blob);
+
+        // עדכון זמן הטריגר הבא:
+        if (triggerIndexRef.current < TRIGGER_PATTERN.length - 1) {
+          // עוברים לטריגר הבא ברשימה
+          triggerIndexRef.current += 1;
+          nextTriggerTimeRef.current =
+            TRIGGER_PATTERN[triggerIndexRef.current];
+        } else {
+          // כבר הגענו ל-50 שניות לפחות פעם אחת –
+          // מעכשיו מוסיפים עוד 50 שניות בכל פעם (50,100,150,...)
+          nextTriggerTimeRef.current += 50000;
+        }
+      }
+    }, 500);
+  }, [isRecording, transcribeBlob]);
+
+  const stopTriggerTimer = useCallback(() => {
+    if (timerIdRef.current) {
+      clearInterval(timerIdRef.current);
+      timerIdRef.current = null;
+    }
+  }, []);
 
   // --- התחלת הקלטה ---
   const startRecording = useCallback(async () => {
@@ -109,28 +177,42 @@ export default function useAudioRecorder(options = {}) {
         mimeType: "audio/webm",
       });
 
-      // איפוס טקסט הסשן בתחילת הקלטה חדשה
-      sessionTextRef.current = "";
+      chunksRef.current = []; // איפוס
+      sessionTextRef.current = ""; // טקסט מצטבר חדש לסשן
+      isTranscribingRef.current = false;
 
-      recorder.ondataavailable = async (event) => {
-        // נקרא כל 5 שניות
-        if (!event.data || event.data.size === 0) return;
-        await transcribeChunk(event.data);
+      recorder.ondataavailable = (event) => {
+        if (event.data && event.data.size > 0) {
+          chunksRef.current.push(event.data);
+        }
       };
 
       recorder.onerror = (err) => {
         console.error("[useAudioRecorder] MediaRecorder error:", err);
       };
 
+      // כשעוצרים את ההקלטה, ננסה לשלוח פעם אחרונה את ההקלטה המלאה (אם אין תמלול רץ)
+      recorder.onstop = async () => {
+        stopTriggerTimer();
+
+        if (chunksRef.current.length && !isTranscribingRef.current) {
+          const blob = new Blob(chunksRef.current, { type: "audio/webm" });
+          await transcribeBlob(blob);
+        }
+      };
+
       mediaRecorderRef.current = recorder;
-      recorder.start(5000); // 👈 כל 5000ms נקבל ondataavailable
+      recorder.start(1000); // כל שניה נקבל chunk קטן ל-chunksRef
 
       setIsRecording(true);
       setIsPaused(false);
+
+      // מפעילים את לוגיקת הטריגרים 5/10/20/30/40/50...
+      startTriggerTimer();
     } catch (err) {
       console.error("[useAudioRecorder] getUserMedia error:", err);
     }
-  }, [isRecording, transcribeChunk]);
+  }, [isRecording, startTriggerTimer, stopTriggerTimer, transcribeBlob]);
 
   // --- Pause ---
   const pauseRecording = useCallback(() => {
@@ -141,14 +223,15 @@ export default function useAudioRecorder(options = {}) {
       if (typeof recorder.pause === "function") {
         recorder.pause();
       } else {
-        // fallback: אם אין pause, נעצור
         recorder.stop();
       }
+      stopTriggerTimer();
       setIsPaused(true);
+      setIsRecording(false);
     } catch (err) {
       console.error("[useAudioRecorder] pause error:", err);
     }
-  }, [isRecording, isPaused]);
+  }, [isRecording, isPaused, stopTriggerTimer]);
 
   // --- Resume ---
   const resumeRecording = useCallback(async () => {
@@ -158,6 +241,10 @@ export default function useAudioRecorder(options = {}) {
       try {
         recorder.resume();
         setIsPaused(false);
+        setIsRecording(true);
+
+        // כשממשיכים, מתחילים שוב את דפוס הטריגרים מהתחלה
+        startTriggerTimer();
         return;
       } catch (err) {
         console.error("[useAudioRecorder] resume error:", err);
@@ -170,7 +257,7 @@ export default function useAudioRecorder(options = {}) {
     } else {
       setIsPaused(false);
     }
-  }, [isRecording, startRecording]);
+  }, [isRecording, startRecording, startTriggerTimer]);
 
   // --- Stop לגמרי ---
   const stopRecording = useCallback(() => {
@@ -178,7 +265,7 @@ export default function useAudioRecorder(options = {}) {
 
     try {
       if (recorder && recorder.state !== "inactive") {
-        recorder.stop();
+        recorder.stop(); // onstop ידאג לשליחה אחרונה אם צריך
       }
     } catch (err) {
       console.error("[useAudioRecorder] stop error:", err);
@@ -187,14 +274,14 @@ export default function useAudioRecorder(options = {}) {
       setIsRecording(false);
       setIsPaused(false);
       isTranscribingRef.current = false;
+      stopTriggerTimer();
 
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((track) => track.stop());
         streamRef.current = null;
       }
-      // לא מאפסים כאן sessionTextRef.current – הטקסט כבר נשלח למעלה
     }
-  }, []);
+  }, [stopTriggerTimer]);
 
   return {
     startRecording,
