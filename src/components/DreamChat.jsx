@@ -445,7 +445,7 @@ function DreamChat({ currentScreen, onChangeScreen }) {
             </button>
           </div>
           */}
-<div class="bg-soft-periwinkle-50 font-sans font-semibold text-white p-6">
+<div className="bg-soft-periwinkle-50 font-sans font-semibold text-white p-6">
   Tailwind color test
 </div>
 

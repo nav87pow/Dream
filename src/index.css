@@ -2,8 +2,60 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  /* Neutral scale */
+  --color-neutral-50: oklch(0.985 0 0);
+  --color-neutral-100: oklch(0.97 0 0);
+  --color-neutral-200: oklch(0.922 0 0);
+  --color-neutral-300: oklch(0.87 0 0);
+  --color-neutral-400: oklch(0.708 0 0);
+  --color-neutral-500: oklch(0.556 0 0);
+  --color-neutral-600: oklch(0.439 0 0);
+  --color-neutral-700: oklch(0.371 0 0);
+  --color-neutral-800: oklch(0.269 0 0);
+  --color-neutral-900: oklch(0.205 0 0);
+  --color-neutral-950: oklch(0.145 0 0);
+
+  /* Pink scale (brand accent) */
+  --color-pink-600: oklch(0.592 0.249 0.584);
+
+  /* Semantic tokens (mono + accent) */
+  --c-text-primary: var(--color-neutral-900);
+  --c-text-secondary: var(--color-neutral-600);
+  --c-text-tertiary: var(--color-neutral-500);
+
+  --c-bg-page: var(--color-neutral-100);
+  --c-bg-surface: var(--color-neutral-200);
+
+  --c-border: var(--color-neutral-400);
+
+  /* Accent = pink-600 */
+  --c-accent: var(--color-pink-600);
+}
+
 @layer base {
   html, body {
     @apply font-sans;
+  }
+
+  body {
+    background: var(--c-bg-page);
+    color: var(--c-text-primary);
+  }
+}
+@layer utilities {
+  @keyframes marquee-left {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+  }
+
+  /* left-to-right */
+  @keyframes marquee-right {
+    0% { transform: translateX(-50%); }
+    100% { transform: translateX(0); }
+  }
+
+  .marquee-pause:hover > div {
+    animation-play-state: paused;
   }
 }
