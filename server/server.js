@@ -122,8 +122,8 @@ Map your interpretation into the JSON fields described in the system message.
     `.trim();
 
     const completion = await client.chat.completions.create({
-      model: "llama-3.1-8b-instant",
-      response_format: { type: "json_object" },
+model: "openai/gpt-oss-20b",    
+  response_format: { type: "json_object" },
       max_tokens: 1200,
       temperature: 0.4,
       messages: [
