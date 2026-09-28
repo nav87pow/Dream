@@ -9,7 +9,7 @@ import DreamInputCard from "./DreamInputCard/DreamInputCard";
 import { API_URL } from "../config/api"; // 👈 נוספה שורה זו
 
 //const API_URL = "http://localhost:4000/api/interpret";
-// const API_URL = "https://dream-eyyq.onrender.com/api/interpret";
+// const API_URL = "https://eightdream.onrender.com/api/interpret";
 
 function DreamChat({ currentScreen, onChangeScreen }) {
   const { language, t } = useTranslation();
@@ -278,7 +278,7 @@ function DreamChat({ currentScreen, onChangeScreen }) {
 
     try {
       const response = await fetch(
-        "https://dream-eyyq.onrender.com/api/interpret",
+        "https://eightdream.onrender.com/api/interpret",
         {
           method: "POST",
           headers: {

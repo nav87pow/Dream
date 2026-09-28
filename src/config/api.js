@@ -5,15 +5,15 @@
 
 //export const API_URL = isLocalhost
 //  ? "http://localhost:4000/api/interpret"
-//  : "https://dream-eyyq.onrender.com/api/interpret";
+//  : "https://eightdream.onrender.com/api/interpret";
 
 //export const TRANSCRIBE_URL = isLocalhost
 //  ? "http://localhost:4000/api/transcribe"
-//  : "https://dream-eyyq.onrender.com/api/transcribe";
+//  : "https://eightdream.onrender.com/api/transcribe";
 
 
 export const API_URL =
-  "https://dream-eyyq.onrender.com/api/interpret";
+  "https://eightdream.onrender.com/api/interpret";
 
 export const TRANSCRIBE_URL =
-  "https://dream-eyyq.onrender.com/api/transcribe";
+  "https://eightdream.onrender.com/api/transcribe";
